@@ -1,7 +1,7 @@
 import express from 'express';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
-import { upload } from '../../../../middleware/upload.js';
+import { upload, bannerUpload } from '../../../../middleware/upload.js';
 import {
     listHeroBannersController,
     uploadHeroBannersController,
@@ -152,11 +152,11 @@ router.get('/hero-banners/home-promotion', adminOnly, listHomePromotionBannersCo
 router.post(
     '/hero-banners/home-promotion',
     adminOnly,
-    upload.single('file'),
+    bannerUpload.single('file'),
     createHomePromotionBannerController
 );
 // A new image may come with the edit (multipart 'file'); without one only the details change.
-router.patch('/hero-banners/home-promotion/:id', adminOnly, upload.single('file'), updateHomePromotionBannerController);
+router.patch('/hero-banners/home-promotion/:id', adminOnly, bannerUpload.single('file'), updateHomePromotionBannerController);
 router.delete('/hero-banners/home-promotion/:id', adminOnly, deleteHomePromotionBannerController);
 router.patch('/hero-banners/home-promotion/:id/status', adminOnly, toggleHomePromotionBannerStatusController);
 router.patch('/hero-banners/home-promotion/:id/order', adminOnly, updateHomePromotionBannerOrderController);
