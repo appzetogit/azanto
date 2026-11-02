@@ -27,6 +27,7 @@ export const masterSidebarMenu = [
         label: "Master Settings",
         icon: "SlidersHorizontal",
         subItems: [
+          { label: "App Services (by zone)", path: "/admin/master/app-services" },
           { label: "Brand & Contact", path: "/admin/master/settings/brand" },
           { label: "Payments & Messages", path: "/admin/master/settings/integrations" },
           { label: "Money Rules & Cash Limit", path: "/admin/master/settings/money" },
@@ -107,7 +108,6 @@ export const masterSidebarMenu = [
         label: "System Settings",
         icon: "Settings",
         subItems: [
-          { label: "App Services", path: "/admin/master/app-services" },
           { label: "Business Setup", path: "/admin/food/business-setup" },
           { label: "Google Maps Key", path: "/admin/food/map-settings" },
           { label: "Order Cancellation", path: "/admin/food/order-cancellation" },
