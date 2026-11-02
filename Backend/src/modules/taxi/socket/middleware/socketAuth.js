@@ -9,7 +9,16 @@ export const getIdentityFromSocket = (socket) => {
     throw new ApiError(401, 'Socket token is required');
   }
 
-  return verifyAccessToken(token);
+  const payload = verifyAccessToken(token);
+
+  // Azanto has one customer login: the food auth issues { userId, role: 'USER' }
+  // for the same `users` account the taxi tokens carry as { sub, role: 'user' }.
+  // Rooms and handlers key on role === 'user' and auth.sub, so normalise the
+  // customer token here (the REST middleware already accepts it).
+  if (String(payload?.role || '').toLowerCase() === 'user') {
+    return { ...payload, role: 'user', sub: payload.sub || payload.userId || payload.id };
+  }
+  return payload;
 };
 
 export const attachSocketAuth = (io) => {
