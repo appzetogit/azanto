@@ -70,8 +70,17 @@ export default function PromotionalBanner() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert("Image size must be 2MB or less")
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowed.includes(file.type)) {
+      alert("Only JPEG, PNG, WebP or GIF files are allowed")
+      return
+    }
+
+    // GIFs are stored as-is (animation kept, no compression), so they get more room.
+    const isGif = file.type === "image/gif"
+    const maxMb = isGif ? 5 : 2
+    if (file.size > maxMb * 1024 * 1024) {
+      alert(`${isGif ? "GIF" : "Image"} size must be ${maxMb}MB or less`)
       return
     }
 
@@ -349,9 +358,9 @@ export default function PromotionalBanner() {
                           <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Upload 5:1 Image</p>
                         </div>
                       )}
-                      <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                     </div>
-                    <p className="text-[10px] text-slate-400">JPEG, PNG or WebP. Max 2MB.</p>
+                    <p className="text-[10px] text-slate-400">JPEG, PNG, WebP (max 2MB) or animated GIF (max 5MB).</p>
                   </div>
 
                   <div className="space-y-4">
