@@ -481,12 +481,16 @@ export default function Banners() {
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm"
                   className="hidden"
                 />
                 {formData.preview ? (
                   <div className="relative w-full max-h-48 flex justify-center items-center overflow-hidden rounded-lg">
-                    <img src={formData.preview} className="max-h-40 object-contain" alt="Preview" />
+                    {(formData.file ? formData.file.type?.startsWith("video/") : /\.(mp4|webm|mov)(\?|$)/i.test(formData.preview || "")) ? (
+                      <video src={formData.preview} className="max-h-40 object-contain" autoPlay muted loop playsInline />
+                    ) : (
+                      <img src={formData.preview} className="max-h-40 object-contain" alt="Preview" />
+                    )}
                   </div>
                 ) : (
                   <>
@@ -494,7 +498,7 @@ export default function Banners() {
                     <p className="text-sm font-medium text-blue-600 mb-1">Click to upload</p>
                     <p className="text-xs text-slate-500 mb-2">Or drag and drop</p>
                     <p className="text-xs text-slate-500">
-                      GIF, JPG, JPEG or PNG · up to {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB · 2:1 works best
+                      GIF, JPG, PNG or MP4 video (best for animation) · up to {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB · 2:1 works best
                     </p>
                     <p className="text-xs text-amber-600 mt-1">
                       Every customer downloads this each time the screen opens — keep it as small as it can look good.
@@ -602,11 +606,15 @@ export default function Banners() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
-                              <img
-                                src={banner.imageUrl}
-                                alt={banner.title || "Banner"}
-                                className="w-full h-full object-cover"
-                              />
+                              {/\.(mp4|webm|mov)(\?|$)/i.test(banner.imageUrl || "") ? (
+                                <video src={banner.imageUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                              ) : (
+                                <img
+                                  src={banner.imageUrl}
+                                  alt={banner.title || "Banner"}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
                             </div>
                             <span className="text-sm font-medium text-slate-900">{banner.title || "Untitled Banner"}</span>
                           </div>

@@ -115,7 +115,7 @@ router.get('/hero-banners', adminOnly, listHeroBannersController);
 router.post(
     '/hero-banners/multiple',
     adminOnly,
-    upload.array('files'),
+    bannerUpload.array('files'),
     uploadHeroBannersController
 );
 router.delete('/hero-banners/:id', adminOnly, deleteHeroBannerController);
