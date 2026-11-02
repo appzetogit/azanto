@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from "react"
 import { Edit, Upload, Info, Trash2, Plus, Calendar, Link as LinkIcon, Save, X, Loader2, Image as ImageIcon } from "lucide-react"
 import api from "@food/api"
 
+// Promo banners may be videos; the stored URL keeps the video extension.
+const isVideoUrl = (u) => /\.(mp4|webm|mov)(\?|$)/i.test(u || "")
+
 const debugError = (...args) => {}
 
 export default function PromotionalBanner() {
@@ -70,9 +73,9 @@ export default function PromotionalBanner() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"]
     if (!allowed.includes(file.type)) {
-      alert("Only JPEG, PNG, WebP or GIF files are allowed")
+      alert("Only JPEG, PNG, WebP, GIF, MP4 or WebM files are allowed")
       return
     }
 
@@ -276,7 +279,11 @@ export default function PromotionalBanner() {
             {banners.map((banner) => (
               <div key={banner._id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
                 <div className="relative aspect-[2/1] bg-slate-100 overflow-hidden">
-                  <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  {isVideoUrl(banner.imageUrl) ? (
+                    <video src={banner.imageUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                  ) : (
+                    <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  )}
                   <div className="absolute top-2 right-2 flex gap-2">
                     <button 
                       onClick={() => openEdit(banner)}
@@ -345,7 +352,11 @@ export default function PromotionalBanner() {
                     <div className="relative aspect-[2/1] rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors">
                       {formData.preview ? (
                         <>
-                          <img src={formData.preview} className="w-full h-full object-cover" />
+                          {(formData.file ? formData.file.type.startsWith("video/") : isVideoUrl(formData.preview)) ? (
+                            <video src={formData.preview} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                          ) : (
+                            <img src={formData.preview} className="w-full h-full object-cover" />
+                          )}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                             <Upload className="w-8 h-8 text-white" />
                           </div>
@@ -356,9 +367,9 @@ export default function PromotionalBanner() {
                           <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Upload 5:1 Image</p>
                         </div>
                       )}
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                     </div>
-                    <p className="text-[10px] text-slate-400">JPEG, PNG, WebP or animated GIF. Max 50MB.</p>
+                    <p className="text-[10px] text-slate-400">JPEG, PNG, WebP, GIF or MP4 video (best for animation). Max 50MB.</p>
                   </div>
 
                   <div className="space-y-4">
