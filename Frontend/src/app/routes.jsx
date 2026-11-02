@@ -13,7 +13,6 @@ const HelpSupportPage = lazy(() => import('../modules/auth/pages/HelpSupportPage
 const TermsPage = lazy(() => import('../modules/auth/pages/TermsPage'))
 const PrivacyPage = lazy(() => import('../modules/auth/pages/PrivacyPage'))
 const LandingPage = lazy(() => import('../modules/LandingPage/LandingPage'))
-const PartnerApp = lazy(() => import('../modules/partner/PartnerApp'))
 import ProtectedRoute from '@food/components/ProtectedRoute'
 
 const PageLoader = () => <AppShellSkeleton />
@@ -141,9 +140,6 @@ const AppRoutes = () => {
 
         {/* Auth Module */}
         <Route path="/login/*" element={<Suspense fallback={<PageLoader />}><AuthApp /></Suspense>} />
-
-        {/* Partner sign-in and registration: restaurant, store, medical store */}
-        <Route path="/partner/*" element={<Suspense fallback={<PageLoader />}><PartnerApp /></Suspense>} />
 
         {/* Support Module */}
         <Route path="/support" element={<Suspense fallback={<PageLoader />}><HelpSupportPage /></Suspense>} />

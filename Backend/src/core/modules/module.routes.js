@@ -2,7 +2,7 @@ import express from 'express';
 import { authMiddleware } from '../auth/auth.middleware.js';
 import { requireRoles } from '../roles/role.middleware.js';
 import { sendResponse, sendError } from '../../utils/response.js';
-import { ALL_MODULES, isKnownModule } from './moduleRegistry.js';
+import { ACTIVE_MODULES, isActiveModule } from './moduleRegistry.js';
 import { getModuleStates, setModuleEnabled } from './moduleState.service.js';
 
 /**
@@ -19,7 +19,8 @@ const router = express.Router();
 router.get('/', authMiddleware, requireRoles('ADMIN'), async (_req, res) => {
     const states = await getModuleStates();
     return sendResponse(res, 200, 'Module states', {
-        modules: ALL_MODULES.map((name) => ({ name, ...states[name] })),
+        // Food and taxi only -- see ACTIVE_MODULES.
+        modules: ACTIVE_MODULES.map((name) => ({ name, ...states[name] })),
     });
 });
 
@@ -27,7 +28,7 @@ router.get('/', authMiddleware, requireRoles('ADMIN'), async (_req, res) => {
 // a revenue decision, not a routine admin one.
 router.patch('/:name', authMiddleware, requireRoles('SUPER_ADMIN'), async (req, res) => {
     const { name } = req.params;
-    if (!isKnownModule(name)) {
+    if (!isActiveModule(name)) {
         return sendError(res, 404, `Unknown module: ${name}`);
     }
 

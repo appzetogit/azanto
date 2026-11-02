@@ -33,6 +33,17 @@ export const ALL_MODULES = Object.freeze(Object.values(MODULES));
 export const isKnownModule = (name) => ALL_MODULES.includes(String(name));
 
 /**
+ * The verticals the admin panel is shown and may switch. The product is food + taxi
+ * only: quick commerce and service-provider are switched off (their routes are no
+ * longer mounted), so offering a switch for them would be a switch that does nothing.
+ * MODULES and ALL_MODULES keep them because code that still imports the QC/SP
+ * modules references MODULES.QUICK_COMMERCE / SERVICE_PROVIDER.
+ */
+export const ACTIVE_MODULES = Object.freeze([MODULES.FOOD, MODULES.TAXI]);
+
+export const isActiveModule = (name) => ACTIVE_MODULES.includes(String(name));
+
+/**
  * Methods that create or change a commitment. Anything outside this set is treated as
  * a read and always allowed through.
  *

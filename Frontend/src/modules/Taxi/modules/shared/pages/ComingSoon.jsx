@@ -39,7 +39,7 @@ const FEATURE_META = {
   '/cab-sharing': {
     icon: <Bus size={48} strokeWidth={1.5} />,
     title: 'Cab Sharing',
-    subtitle: 'Share rides, save big — Quick Drop\'s USP',
+    subtitle: 'Share rides, save big — Azanto\'s USP',
     description: 'Real-time seat booking in shared cabs. Choose your seat, split the fare, and travel smart.',
     color: 'bg-green-50',
     accent: 'text-green-600',

@@ -7,27 +7,27 @@ const LinksPage = () => {
   const links = [
     {
       id: 'user',
-      title: 'Quick Drop - User app',
+      title: 'Azanto - User app',
       subtitle: 'Book rides, send parcels, and more.',
       description: 'Get where you need to go with ease. Request a ride or send packages across the city in minutes.',
-      url: 'https://play.google.com/store/apps/details?id=com.Quick Drop.user',
+      url: 'https://play.google.com/store/apps/details?id=com.Azanto.user',
       type: 'Customer App',
       icon: <Zap className="link-icon" />,
       color: '#FFB300'
     },
     {
       id: 'driver',
-      title: 'Quick Drop Driver',
-      subtitle: 'Drive and earn with Quick Drop.',
+      title: 'Azanto Driver',
+      subtitle: 'Drive and earn with Azanto.',
       description: 'Join our fleet of professional drivers. Flexible hours, great earnings, and a supportive community.',
-      url: 'https://play.google.com/store/apps/details?id=com.Quick Drop.driver',
+      url: 'https://play.google.com/store/apps/details?id=com.Azanto.driver',
       type: 'Partner App',
       icon: <Shield className="link-icon" />,
       color: '#2563EB'
     }
   ];
   React.useEffect(() => {
-    document.title = "Download Apps | Quick Drop";
+    document.title = "Download Apps | Azanto";
   }, []);
 
   return (
@@ -35,20 +35,20 @@ const LinksPage = () => {
       <nav className="links-nav">
         <div className="nav-container">
           <a href="/" className="nav-logo">
-            <span className="logo-Quick Drop">Quick Drop</span>
+            <span className="logo-Azanto">Azanto</span>
           </a>
           <a href="/" className="back-home">Back to Home</a>
         </div>
       </nav>
 
       <div className="links-banner">
-        <img src={bannerImg} alt="Quick Drop Banner" className="banner-image" />
+        <img src={bannerImg} alt="Azanto Banner" className="banner-image" />
         <div className="banner-gradient"></div>
       </div>
 
       <div className="links-content-wrapper">
         <header className="links-header">
-          <h1 className="links-title">Download <span className="highlight">Quick Drop</span></h1>
+          <h1 className="links-title">Download <span className="highlight">Azanto</span></h1>
           <p className="links-tagline">Choose the app that's right for you and start your journey today.</p>
         </header>
 
@@ -90,9 +90,9 @@ const LinksPage = () => {
         </div>
 
         <footer className="links-footer">
-          <p>© 2026 Quick Drop. All rights reserved.</p>
+          <p>© 2026 Azanto. All rights reserved.</p>
           <div className="footer-links">
-            <a href="https://Quick Drop.com" target="_blank" rel="noopener noreferrer">Visit Website</a>
+            <a href="https://Azanto.com" target="_blank" rel="noopener noreferrer">Visit Website</a>
             <span className="dot"></span>
             <a href="/support">Support</a>
           </div>

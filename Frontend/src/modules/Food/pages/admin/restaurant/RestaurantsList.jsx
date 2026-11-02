@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from "react"
-import { verticalAdminPath } from "../../../components/admin/AdminSidebar"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Search, Download, ChevronDown, Eye, Settings, ArrowUpDown, Loader2, X, MapPin, Phone, Mail, Clock, Star, Building2, User, FileText, CreditCard, Calendar, Image as ImageIcon, ExternalLink, ShieldX, AlertTriangle, Trash2, Plus, KeyRound } from "lucide-react"
 import { toast } from "sonner"
@@ -1406,7 +1405,7 @@ export default function RestaurantsList() {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate(verticalAdminPath("/admin/food/restaurants/add"))}
+                onClick={() => navigate("/admin/food/restaurants/add")}
                 className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 transition-all"
               >
                 <Plus className="w-4 h-4" />
@@ -1648,7 +1647,7 @@ export default function RestaurantsList() {
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => navigate(verticalAdminPath(`/admin/food/restaurants/edit/${restaurant._id || restaurant.id}`))}
+                              onClick={() => navigate(`/admin/food/restaurants/edit/${restaurant._id || restaurant.id}`)}
                               className="p-1.5 rounded text-amber-600 hover:bg-amber-50 transition-colors"
                               title="Edit restaurant & web login password"
                             >

@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCw, ChevronDown } from "lucide-react"
 import { platformPnlAPI } from "@food/api"
-import { SERVICE_PROVIDER_ENABLED } from "@/config/features"
 
 /**
  * Master > Report Management > Platform Earnings.
  *
- * What the platform kept, across Food, Quick & Medical, Taxi and Services, from
+ * What the platform kept, across Food and Taxi, from
  * each service's own record of how every order, ride or bill was split
  * (core/finance/platformPnl.service.js). GST is shown beside income, not in it.
  */
@@ -36,9 +35,7 @@ const PRESETS = [
 
 const SERVICE_COLOR = {
   food: "bg-orange-500",
-  quick: "bg-emerald-600",
   taxi: "bg-amber-400",
-  services: "bg-sky-600",
 }
 
 const rupees = (n, { sign = false } = {}) => {
@@ -146,9 +143,8 @@ export default function PlatformEarnings() {
     load()
   }, [load])
 
-  // Services is only listed where the module is switched on, or where it has earned something.
   const services = useMemo(
-    () => (data?.services || []).filter((s) => s.key !== "services" || SERVICE_PROVIDER_ENABLED || s.count > 0),
+    () => (data?.services || []).filter((s) => s.key === "food" || s.key === "taxi"),
     [data],
   )
   const totals = data?.totals
@@ -283,8 +279,8 @@ export default function PlatformEarnings() {
             </section>
 
             <div className="space-y-1 text-xs text-neutral-500">
-              <p>Food and Quick count delivered orders by the day they were placed; Taxi counts rides by the day they finished; Services counts bills by the day they were paid. Dates are India time.</p>
-              <p>Not included yet: seller and worker subscription fees, and wallet top-ups. Taxi&rsquo;s service tax is inside the fare and isn&rsquo;t recorded separately, so its GST shows as —.</p>
+              <p>Food counts delivered orders by the day they were placed; Taxi counts rides by the day they finished. Dates are India time.</p>
+              <p>Not included yet: restaurant subscription fees, and wallet top-ups. Taxi&rsquo;s service tax is inside the fare and isn&rsquo;t recorded separately, so its GST shows as —.</p>
             </div>
           </>
         )}

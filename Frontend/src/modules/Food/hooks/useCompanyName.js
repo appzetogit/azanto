@@ -3,7 +3,7 @@ import { loadBusinessSettings, getCachedSettings, normalizeCompanyName } from '@
 
 /**
  * Custom hook to get company name from business settings
- * @returns {string} Company name with fallback to "Quick Drop"
+ * @returns {string} Company name with fallback to "Azanto"
  */
 export const useCompanyName = () => {
   const [companyName, setCompanyName] = useState(() => {

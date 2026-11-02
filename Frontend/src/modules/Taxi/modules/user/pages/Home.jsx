@@ -802,7 +802,7 @@ const Home = () => {
                     ? 'Rental booking' 
                     : serviceType === 'parcel' 
                       ? 'Parcel Delivery' 
-                      : 'Quick Drop'}
+                      : 'Azanto'}
                 </h4>
                 <p 
                   className="text-[12px] font-bold mt-1 flex items-center gap-0.5 leading-none"

@@ -48,7 +48,7 @@ export default function AboutUs() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [aboutData, setAboutData] = useState({
-    appName: 'Quick Drop Food',
+    appName: 'Azanto Food',
     version: '1.0.0',
     description: '',
     logo: '',
@@ -234,7 +234,7 @@ export default function AboutUs() {
                 id="logo"
                 value={aboutData.logo}
                 onChange={(e) => setAboutData(prev => ({ ...prev, logo: e.target.value }))}
-                placeholder="https://example.com/k9-logo.jpg"
+                placeholder="https://example.com/logo.png"
                 className="mt-1"
               />
             </div>

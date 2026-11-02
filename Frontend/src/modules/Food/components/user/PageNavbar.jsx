@@ -7,7 +7,7 @@ import { useCart } from "@food/context/CartContext"
 import { useLocationSelector } from "./UserLayout"
 import { FaLocationDot } from "react-icons/fa6"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
-import quickSpicyLogo from "@food/assets/k9-logo.jpg"
+import quickSpicyLogo from "@food/assets/azanto-logo.png"
 import { useSettings } from "../../../Taxi/shared/context/SettingsContext"
 
 export default function PageNavbar({

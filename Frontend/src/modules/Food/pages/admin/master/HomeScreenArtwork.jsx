@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
-import { Loader2, RefreshCw, ExternalLink, Upload, Trash2, ImageOff } from "lucide-react"
+import { Loader2, RefreshCw, ExternalLink, ImageOff } from "lucide-react"
 import { homeContentAPI } from "@food/api"
 
 /**
@@ -9,8 +9,7 @@ import { homeContentAPI } from "@food/api"
  *
  * Every picture the customer app shows on its home screens, grouped by where it
  * appears (core/cms/homeContent.service.js). Pause and resume work here for all
- * of them; uploading and editing open each service's own screen -- except
- * Quick's top banners, which have no other screen and are managed here.
+ * of them; uploading and editing open each service's own screen.
  *
  * The file and its API path avoid the word "banner": ad blockers block requests
  * and scripts whose URL contains it, and the page would silently load empty.
@@ -26,7 +25,7 @@ const STATE = {
 const errorText = (err, fallback) => err?.response?.data?.message || fallback
 const day = (v) => (v ? new Date(v).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "")
 
-function Tile({ item, busy, onToggle, onRemove }) {
+function Tile({ item, busy, onToggle }) {
   const s = STATE[item.state] || STATE.live
   const dates = item.startDate || item.endDate ? `${item.startDate ? day(item.startDate) : "…"} – ${item.endDate ? day(item.endDate) : "…"}` : ""
   return (
@@ -60,28 +59,17 @@ function Tile({ item, busy, onToggle, onRemove }) {
               {item.state === "paused" ? "Resume" : "Pause"}
             </button>
           )}
-          {onRemove && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onRemove}
-              className="ml-auto rounded-md p-1 text-neutral-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
-              aria-label="Delete this picture"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </div>
     </li>
   )
 }
 
-function Grid({ items, busy, toggle, remove }) {
+function Grid({ items, busy, toggle }) {
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {items.map((it) => (
-        <Tile key={it.id} item={it} busy={busy === it.id} onToggle={() => toggle(it)} onRemove={remove ? () => remove(it) : null} />
+        <Tile key={it.id} item={it} busy={busy === it.id} onToggle={() => toggle(it)} />
       ))}
     </ul>
   )
@@ -92,8 +80,6 @@ export default function HomeScreenArtwork() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState("")
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,39 +109,6 @@ export default function HomeScreenArtwork() {
       toast.error(errorText(err, "Could not change this banner."))
     } finally {
       setBusy("")
-    }
-  }
-
-  const removeTop = async (item) => {
-    if (!window.confirm("Delete this picture from Quick's home? This can't be undone.")) return
-    setBusy(item.id)
-    try {
-      await homeContentAPI.removeQuickTop(item.id)
-      toast.success("Deleted")
-      await load()
-    } catch (err) {
-      toast.error(errorText(err, "Could not delete it."))
-    } finally {
-      setBusy("")
-    }
-  }
-
-  const uploadTop = async (files) => {
-    if (!files?.length) return
-    const form = new FormData()
-    Array.from(files).forEach((f) => form.append("files", f))
-    setUploading(true)
-    try {
-      const res = await homeContentAPI.uploadQuickTop(form)
-      const errs = res?.data?.data?.errors || []
-      if (errs.length) toast.error(errs[0])
-      else toast.success(`${files.length} picture${files.length === 1 ? "" : "s"} added to Quick's home`)
-      await load()
-    } catch (err) {
-      toast.error(errorText(err, "Could not upload."))
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ""
     }
   }
 
@@ -194,19 +147,11 @@ export default function HomeScreenArtwork() {
                     {g.where} · <span className="tabular-nums">{g.live}</span> live
                   </p>
                 </div>
-                {g.key === "quickTop" ? (
-                  <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-sm font-semibold text-white hover:bg-neutral-800 ${uploading ? "pointer-events-none opacity-60" : ""}`}>
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    Add pictures
-                    <input ref={fileRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => uploadTop(e.target.files)} />
-                  </label>
-                ) : (
-                  g.editPath && (
-                    <Link to={g.editPath} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50">
-                      Add or edit
-                      <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
-                    </Link>
-                  )
+                {g.editPath && (
+                  <Link to={g.editPath} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50">
+                    Add or edit
+                    <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
+                  </Link>
                 )}
               </div>
 
@@ -227,7 +172,7 @@ export default function HomeScreenArtwork() {
                     </div>
                   ))
                 ) : g.items.length ? (
-                  <Grid items={g.items} busy={busy} toggle={toggle} remove={g.key === "quickTop" ? removeTop : null} />
+                  <Grid items={g.items} busy={busy} toggle={toggle} />
                 ) : (
                   <p className="rounded-lg border border-dashed border-neutral-200 px-3 py-6 text-center text-sm text-neutral-500">
                     Nothing here yet, so this spot is empty in the app.

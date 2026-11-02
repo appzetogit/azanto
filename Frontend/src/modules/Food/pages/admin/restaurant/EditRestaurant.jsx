@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { verticalAdminPath } from "../../../components/admin/AdminSidebar"
 import { useNavigate, useParams } from "react-router-dom"
 import { adminAPI } from "@food/api"
 import { Input } from "@food/components/ui/input"
@@ -416,7 +415,7 @@ export default function EditRestaurant() {
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(verticalAdminPath("/admin/food/restaurants"))}
+              onClick={() => navigate("/admin/food/restaurants")}
               className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50"
               title="Back"
             >

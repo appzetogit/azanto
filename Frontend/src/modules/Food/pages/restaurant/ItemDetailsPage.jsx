@@ -85,13 +85,6 @@ const createVariantDraft = (variant = {}) => ({
   minOrderQuantity: variant?.minOrderQuantity != null ? String(variant.minOrderQuantity) : "",
   maxOrderQuantity: variant?.maxOrderQuantity != null ? String(variant.maxOrderQuantity) : "",
   addonIds: Array.isArray(variant?.addonIds) ? variant.addonIds.map(String) : [],
-  // Units on hand for this size (stores only). Blank = not counted, no limit.
-  stockQty: variant?.stockQty != null ? String(variant.stockQty) : "",
-  lowStockThreshold: variant?.lowStockThreshold != null ? String(variant.lowStockThreshold) : "",
-  // As loaded. Only a count the owner changed is sent, so a form left open
-  // while orders come in does not put back the units those orders took.
-  stockQtyAtLoad: variant?.stockQty != null ? String(variant.stockQty) : "",
-  lowStockAtLoad: variant?.lowStockThreshold != null ? String(variant.lowStockThreshold) : "",
   // Price each pairing charges on THIS size, keyed by addon id. Empty string
   // means "the add-on's own price" -- the server stores that as null.
   addonPrices: Object.fromEntries(
@@ -268,17 +261,6 @@ export default function ItemDetailsPage() {
   const [preparationTime, setPreparationTime] = useState("")
   const [minOrderQuantity, setMinOrderQuantity] = useState("0")
   const [maxOrderQuantity, setMaxOrderQuantity] = useState("0")
-  /*
-   * Stock, for stores and medical stores (quick commerce) only: restaurants sell
-   * dishes, which are not counted. Blank = not counted, sells without a limit.
-   * A product with sizes counts each size instead (the size rows below).
-   */
-  const isQcStore = (() => {
-    try { return localStorage.getItem("restaurant_vertical") === "qc" } catch { return false }
-  })()
-  const [stockQty, setStockQty] = useState("")
-  const [lowStockThreshold, setLowStockThreshold] = useState("")
-  const stockAtLoad = useRef({ stock: "", low: "" })
   /*
    * "inherit" | "inclusive" | "exclusive".
    *
@@ -460,12 +442,6 @@ export default function ItemDetailsPage() {
     setPreparationTime(item.preparationTime || "")
     setMinOrderQuantity(String(item.minOrderQuantity ?? 0))
     setMaxOrderQuantity(String(item.maxOrderQuantity ?? 0))
-    setStockQty(item.stockQty != null ? String(item.stockQty) : "")
-    setLowStockThreshold(item.lowStockThreshold != null ? String(item.lowStockThreshold) : "")
-    stockAtLoad.current = {
-      stock: item.stockQty != null ? String(item.stockQty) : "",
-      low: item.lowStockThreshold != null ? String(item.lowStockThreshold) : "",
-    }
     setAvailabilitySchedule(buildScheduleState(item.availabilitySchedule))
     // null means the dish never answered and follows the restaurant.
     setGstMode(
@@ -988,10 +964,6 @@ export default function ItemDetailsPage() {
           maxOrderQuantity: variant.maxOrderQuantity ?? "",
           addonIds: Array.isArray(variant.addonIds) ? variant.addonIds : [],
           addonPrices: variant.addonPrices || {},
-          stockQty: variant.stockQty ?? "",
-          lowStockThreshold: variant.lowStockThreshold ?? "",
-          stockChanged: (variant.stockQty ?? "") !== (variant.stockQtyAtLoad ?? ""),
-          lowChanged: (variant.lowStockThreshold ?? "") !== (variant.lowStockAtLoad ?? ""),
         }))
         .filter((variant) => variant.name || variant.persistedId || variant.price)
 
@@ -1023,25 +995,7 @@ export default function ItemDetailsPage() {
           const price = raw === undefined || raw === "" ? null : Number(raw)
           return { addonId, price: Number.isFinite(price) ? price : null }
         }),
-        // Stores only. Blank = not counted. Restaurants send nothing, so the
-        // server keeps whatever a size already had.
-        ...(isQcStore && variant.stockChanged
-          ? { stockQty: variant.stockQty === "" ? null : Number(variant.stockQty) }
-          : {}),
-        ...(isQcStore && variant.lowChanged
-          ? { lowStockThreshold: variant.lowStockThreshold === "" ? null : Number(variant.lowStockThreshold) }
-          : {}),
       }))
-
-      // Product-level stock: stores only, and only for a product without sizes.
-      const stockPayload = isQcStore && !hasVariants
-        ? {
-            ...(stockQty !== stockAtLoad.current.stock ? { stockQty: stockQty === "" ? null : Number(stockQty) } : {}),
-            ...(lowStockThreshold !== stockAtLoad.current.low
-              ? { lowStockThreshold: lowStockThreshold === "" ? null : Number(lowStockThreshold) }
-              : {}),
-          }
-        : {}
 
       const orderRulesPayload = {
         /*
@@ -1078,7 +1032,6 @@ export default function ItemDetailsPage() {
           isRecommended,
           preparationTime: preparationTime || "",
           ...orderRulesPayload,
-          ...stockPayload,
           categoryId: categoryId || undefined,
           categoryName,
         })
@@ -1103,7 +1056,6 @@ export default function ItemDetailsPage() {
           isRecommended,
           preparationTime: preparationTime || "",
           ...orderRulesPayload,
-          ...stockPayload,
           categoryId: categoryId || undefined,
           categoryName,
         })
@@ -1651,7 +1603,7 @@ export default function ItemDetailsPage() {
                       {taxSettings.priceIncludesGst
                         ? "The price you enter already includes GST, so the customer pays exactly this price."
                         : `GST${Number(taxSettings.gstRate) > 0 ? ` of ${taxSettings.gstRate}%` : ""} is added on top of the price you enter, at checkout.`}
-                      {" "}Set by Quick Drop admin.
+                      {" "}Set by Azanto admin.
                     </p>
                   </div>
 
@@ -1815,34 +1767,6 @@ export default function ItemDetailsPage() {
                                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
                                   />
                                 </div>
-                                {isQcStore && (
-                                  <>
-                                    <div>
-                                      <label className="block text-xs font-semibold text-gray-700 mb-1">In stock</label>
-                                      <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={variant.stockQty ?? ""}
-                                        onChange={(e) => handleVariantChange(variant.localId, "stockQty", e.target.value.replace(/[^0-9]/g, ""))}
-                                        placeholder="No limit"
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                        Warn me at <span className="font-normal text-gray-400">(optional)</span>
-                                      </label>
-                                      <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={variant.lowStockThreshold ?? ""}
-                                        onChange={(e) => handleVariantChange(variant.localId, "lowStockThreshold", e.target.value.replace(/[^0-9]/g, ""))}
-                                        placeholder="No warning"
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-                                      />
-                                    </div>
-                                  </>
-                                )}
 
                                 {/* Variant specific addons */}
                                 {availableAddons.length > 0 && (
@@ -2008,48 +1932,6 @@ export default function ItemDetailsPage() {
                     </div>
                   </div>
 
-                  {isQcStore && (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-sm font-semibold text-gray-900">Stock</p>
-                      {variantsEnabled ? (
-                        <p className="mt-1 text-xs text-gray-600">
-                          This product sells by size, so each size has its own count above. You can also change counts on the Stock page.
-                        </p>
-                      ) : (
-                        <>
-                          <p className="mt-1 text-xs text-gray-600">
-                            Customers can buy only what is in stock, and orders reduce it automatically. Leave empty to sell without a limit.
-                          </p>
-                          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1.5">In stock</label>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={stockQty}
-                                onChange={(e) => setStockQty(e.target.value.replace(/[^0-9]/g, ""))}
-                                placeholder="No limit"
-                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                Warn me at <span className="font-normal text-gray-400">(optional)</span>
-                              </label>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={lowStockThreshold}
-                                onChange={(e) => setLowStockThreshold(e.target.value.replace(/[^0-9]/g, ""))}
-                                placeholder="No warning"
-                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm"
-                              />
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
 
                   {/*
                     The GST inclusive/exclusive chooser is hidden from restaurants.

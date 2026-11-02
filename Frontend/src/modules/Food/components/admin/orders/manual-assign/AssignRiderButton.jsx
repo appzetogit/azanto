@@ -8,7 +8,7 @@ import { canAssignRider, isManualPending } from "./manualAssignUtils"
  * its modal. Renders nothing once the order is past the assignable states or a
  * rider has accepted it.
  */
-export default function AssignRiderButton({ order, vertical, onAssigned, size = "sm", className = "" }) {
+export default function AssignRiderButton({ order, onAssigned, size = "sm", className = "" }) {
   const [open, setOpen] = useState(false)
   if (!order || !canAssignRider(order)) return null
 
@@ -37,7 +37,6 @@ export default function AssignRiderButton({ order, vertical, onAssigned, size = 
             open={open}
             onOpenChange={setOpen}
             order={order}
-            vertical={vertical}
             onAssigned={onAssigned}
           />
         </span>

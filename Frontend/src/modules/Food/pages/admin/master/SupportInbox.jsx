@@ -21,7 +21,6 @@ const STATUS = Object.fromEntries(STATUSES.map((s) => [s.key, s]))
 const SERVICES = [
   { key: "", label: "All services" },
   { key: "food", label: "Food" },
-  { key: "quickCommerce", label: "Quick & Medical" },
   { key: "taxi", label: "Taxi" },
 ]
 
@@ -325,7 +324,7 @@ export default function SupportInbox() {
           <div>
             <h1 className="text-2xl font-semibold text-neutral-900">Help &amp; Support</h1>
             <p className="mt-1 text-sm text-neutral-600">
-              Tickets from customers, restaurants, stores, riders and drivers in Food, Quick, Medical and Taxi.
+              Tickets from customers, restaurants, riders and drivers in Food and Taxi.
             </p>
           </div>
           <button

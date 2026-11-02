@@ -7,12 +7,12 @@ import { useAdminAccess, isRestricted, can, hasPanel } from "@food/utils/adminAc
 
 /**
  * Master > Cancellation Policy: how long a customer may cancel after the
- * restaurant or store accepts, set once for Food and Quick & Medical
+ * restaurant accepts, set once for Food
  * (modules/food/orders/services/cancellationPolicy.js on the server).
  *
  * Each setting has three states: the service's own (not set here), on, off.
- * Unset keeps Food's Order cancellation screen and Quick's "only before the
- * store accepts". Never once the rider has picked the order up, whatever is set.
+ * Unset keeps Food's Order cancellation screen. Never once the rider has
+ * picked the order up, whatever is set.
  */
 
 const KEYS = {
@@ -25,11 +25,10 @@ const KEYS = {
 const SCOPES = [
   { id: "*", level: "global", label: "All services" },
   { id: "food", level: "vertical", label: "Food" },
-  { id: "quickCommerce", level: "vertical", label: "Quick & Medical" },
 ]
-const SERVICE_LABEL = { food: "Food", quickCommerce: "Quick & Medical" }
-// Whose zones each tab's zone picker lists. A pharmacy order carries a Medical zone.
-const ZONE_MODULES = { "*": ["food", "quickCommerce", "medical"], food: ["food"], quickCommerce: ["quickCommerce", "medical"] }
+const SERVICE_LABEL = { food: "Food" }
+// Whose zones each tab's zone picker lists.
+const ZONE_MODULES = { "*": ["food"], food: ["food"] }
 
 const btnCls =
   "inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-500"
@@ -101,7 +100,7 @@ export default function MasterCancellation() {
   const access = useAdminAccess()
   const limited = isRestricted(access)
   const visibleScopes = limited
-    ? SCOPES.filter((s) => s.id !== "*" && (s.id === "quickCommerce" ? hasPanel(access, "quickCommerce") || hasPanel(access, "medical") : hasPanel(access, s.id)))
+    ? SCOPES.filter((s) => s.id !== "*" && hasPanel(access, s.id))
     : SCOPES
   useEffect(() => {
     if (limited && visibleScopes.length && !visibleScopes.some((s) => s.id === scopeId)) setScopeId(visibleScopes[0].id)
@@ -248,7 +247,7 @@ export default function MasterCancellation() {
               <h2 className="font-semibold text-neutral-900">{scope.id === "*" ? "For every service" : `Only for ${target.label}`}</h2>
               <p className="mt-0.5 text-sm text-neutral-500">
                 {scope.id === "*"
-                  ? "Applies to Food and Quick & Medical unless a service or zone has its own value."
+                  ? "Applies to Food unless a service or zone has its own value."
                   : zone.id
                     ? `Overrides ${scope.label}'s value for orders in ${zone.name} only. Empty fields keep ${scope.label}'s value.`
                     : `Overrides the "All services" value for ${scope.label}.`}
@@ -260,8 +259,8 @@ export default function MasterCancellation() {
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                &ldquo;{ownLabel}&rdquo; leaves it to the service: Food&rsquo;s Order cancellation screen, and for Quick &amp; Medical, cancelling only
-                before the store accepts. When a customer cancels an accepted order, the restaurant or store is told to stop, and any assigned
+                &ldquo;{ownLabel}&rdquo; leaves it to the service: Food&rsquo;s Order cancellation screen.
+                When a customer cancels an accepted order, the restaurant is told to stop, and any assigned
                 rider is told not to pick it up.
               </p>
             </div>
@@ -274,7 +273,7 @@ export default function MasterCancellation() {
               <div className="space-y-5">
                 <Setting
                   label="Hold new orders before they reach the restaurant"
-                  hint="The order waits this long before the restaurant or store is alerted; the customer can cancel free meanwhile. 0 sends orders straight away. Empty keeps the all-services value."
+                  hint="The order waits this long before the restaurant is alerted; the customer can cancel free meanwhile. 0 sends orders straight away. Empty keeps the all-services value."
                 >
                   <div className="flex w-56 gap-2">
                     <input
@@ -306,7 +305,7 @@ export default function MasterCancellation() {
                 <Setting label="Allow cancelling after acceptance" hint="Off: the Cancel option disappears the moment the order is accepted.">
                   <TriState value={values.allowAfterAccept} onChange={set("allowAfterAccept")} label="Allow cancelling after acceptance" disabled={saving} ownLabel={ownLabel} />
                 </Setting>
-                <Setting label="For how many minutes" hint="Counted from when the restaurant or store accepted. Empty keeps the service's own.">
+                <Setting label="For how many minutes" hint="Counted from when the restaurant accepted. Empty keeps the service's own.">
                   <div className="relative w-40">
                     <input
                       type="number"
@@ -325,7 +324,7 @@ export default function MasterCancellation() {
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400">min</span>
                   </div>
                 </Setting>
-                <Setting label="Stop once preparing starts" hint="On: cancelling closes when the kitchen or store marks it preparing, even inside the window.">
+                <Setting label="Stop once preparing starts" hint="On: cancelling closes when the kitchen marks it preparing, even inside the window.">
                   <TriState value={values.stopWhenPreparing} onChange={set("stopWhenPreparing")} label="Stop once preparing starts" disabled={saving} ownLabel={ownLabel} />
                 </Setting>
               </div>

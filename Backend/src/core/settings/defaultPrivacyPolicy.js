@@ -12,7 +12,7 @@
 
 const esc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function defaultPrivacyPolicyHtml({ brand = 'Quick Drop', email = '', updated = new Date() } = {}) {
+export function defaultPrivacyPolicyHtml({ brand = 'Azanto', email = '', updated = new Date() } = {}) {
   const b = esc(brand);
   const date = updated.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
   const contactLine = email

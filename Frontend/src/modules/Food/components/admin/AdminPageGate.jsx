@@ -1,7 +1,6 @@
 import { Navigate, useLocation, useNavigate } from "react-router-dom"
 import { Lock } from "lucide-react"
 import { adminSidebarMenu } from "@food/utils/adminSidebarMenu"
-import { rebaseAdminMenu } from "./AdminSidebar"
 import {
   useAdminAccess,
   isRestricted,
@@ -13,15 +12,13 @@ import {
 
 const PANELS = [
   { service: "food", base: "/admin/food", label: "Food" },
-  { service: "quickCommerce", base: "/admin/quick-commerce", label: "Quick Commerce" },
-  { service: "medical", base: "/admin/medical", label: "Medical" },
   { service: "taxi", base: "/taxi/admin/dashboard", label: "Taxi" },
 ]
 
 /** First screen this admin can open in a panel, or null. */
 function landingFor(access, panel) {
   if (panel.service === "taxi") return panel.base
-  return firstOpenPath(rebaseAdminMenu(adminSidebarMenu, panel.base), access)
+  return firstOpenPath(adminSidebarMenu, access)
 }
 
 /**

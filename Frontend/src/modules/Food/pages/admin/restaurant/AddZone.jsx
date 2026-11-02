@@ -3,15 +3,8 @@ import { useNavigate, useParams } from "react-router-dom"
 import { MapPin, ArrowLeft, Save, X, Hand, Shapes, Search } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
-import { currentAdminBase } from "@food/components/admin/AdminSidebar"
 
-/*
- * These screens serve the food, quick-commerce and medical panels. A hardcoded
- * /admin/food path sent the medical panel's Add/Edit/View into FOOD zone setup,
- * so a "medical" zone was drawn and saved as a food zone, and every save landed
- * back in food. The base follows the panel the admin is in.
- */
-const zoneSetupBase = () => `${currentAdminBase(window.location.pathname)}/zone-setup`
+const zoneSetupBase = () => "/admin/food/zone-setup"
 
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}

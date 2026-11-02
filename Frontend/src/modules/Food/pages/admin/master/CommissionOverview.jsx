@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Loader2, RefreshCw, ExternalLink, Search, AlertTriangle } from "lucide-react"
 import { commissionOverviewAPI } from "@food/api"
-import { SERVICE_PROVIDER_ENABLED } from "@/config/features"
 import TablePagination, { usePagination, SCROLL_TABLE_CLASS, STICKY_THEAD_CLASS } from "@food/components/admin/TablePagination"
 
 /**
@@ -11,7 +10,7 @@ import TablePagination, { usePagination, SCROLL_TABLE_CLASS, STICKY_THEAD_CLASS 
  * What the platform takes from every partner, in one place
  * (core/finance/commissionOverview.service.js). Each seller's rate is the one
  * its next order would be charged, from the services' own rate functions --
- * schedules and the Medical default included -- beside what it actually paid
+ * schedules included -- beside what it actually paid
  * over the last 30 days. Read-only: each block links to where its rates are set.
  */
 
@@ -19,7 +18,6 @@ const SOURCE = {
   restaurant_default: { label: "Own rate", tone: "bg-neutral-100 text-neutral-700" },
   schedule_restaurant: { label: "Scheduled", tone: "bg-sky-50 text-sky-800" },
   schedule_platform: { label: "Scheduled (all)", tone: "bg-sky-50 text-sky-800" },
-  medical_default: { label: "Medical default", tone: "bg-violet-50 text-violet-800" },
   plan: { label: "On a plan", tone: "bg-emerald-50 text-emerald-800" },
   none: { label: "No rate", tone: "bg-amber-50 text-amber-800" },
 }
@@ -47,7 +45,7 @@ function EditLink({ to, children }) {
   )
 }
 
-function SellerTable({ rows, q, showKind, storageKey }) {
+function SellerTable({ rows, q, storageKey }) {
   const shown = rows.filter((r) => !q || r.name.toLowerCase().includes(q))
   const pagination = usePagination(shown, { storageKey, resetOn: [q] })
   if (!shown.length) return <p className="px-5 py-6 text-sm text-neutral-500">{rows.length ? "No seller matches the search." : "No sellers yet."}</p>
@@ -69,7 +67,6 @@ function SellerTable({ rows, q, showKind, storageKey }) {
             <tr key={r.id} className={r.source === "none" ? "bg-amber-50/40" : ""}>
               <td className="px-5 py-2.5">
                 <p className="font-medium text-neutral-900">{r.name}</p>
-                {showKind && <p className="text-xs capitalize text-neutral-500">{r.kind}</p>}
               </td>
               <td className="px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -130,7 +127,7 @@ export default function CommissionOverview() {
   }, [load])
 
   const services = useMemo(
-    () => (data?.services || []).filter((s) => s.key !== "services" || SERVICE_PROVIDER_ENABLED),
+    () => (data?.services || []).filter((s) => s.key === "food" || s.key === "taxi"),
     [data],
   )
   const query = q.trim().toLowerCase()
@@ -183,23 +180,15 @@ export default function CommissionOverview() {
                   {s.key === "food" && s.mode === "plan" && (
                     <p className="text-sm text-emerald-800">Restaurants are on a subscription plan, so no commission is charged.</p>
                   )}
-                  {s.key === "quick" && (
-                    <p className="text-sm text-neutral-600">
-                      Pharmacies with no rate of their own pay the Medical default:{" "}
-                      <span className="font-medium text-neutral-900">{s.medicalDefault?.value > 0 ? rateText(s.medicalDefault) : "not set"}</span>.
-                    </p>
-                  )}
                   {s.key === "taxi" && <p className="text-sm text-neutral-600">Taken from the driver&rsquo;s fare, set on each vehicle and city price row.</p>}
                   <Summary s={s.summary} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {s.key === "quick" && <EditLink to="/admin/medical/commission">Medical default</EditLink>}
                   <EditLink to={s.editPath}>Change rates</EditLink>
                 </div>
               </div>
 
               {s.key === "food" && <SellerTable rows={s.rows} q={query} storageKey="commission-overview-food" />}
-              {s.key === "quick" && <SellerTable rows={s.rows} q={query} showKind storageKey="commission-overview-quick" />}
 
               {s.key === "taxi" &&
                 (s.rows.length ? (
@@ -234,29 +223,12 @@ export default function CommissionOverview() {
                   <p className="px-5 py-6 text-sm text-neutral-500">No price rows yet.</p>
                 ))}
 
-              {s.key === "services" && (
-                <dl className="grid gap-4 px-5 py-4 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs text-neutral-500">Platform&rsquo;s share of service charges</dt>
-                    <dd className="text-2xl font-semibold tabular-nums text-neutral-900">{s.platformShare.service}%</dd>
-                    <dd className="text-xs text-neutral-500">Vendor keeps {s.vendorShare.service}%</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-neutral-500">Platform&rsquo;s share of parts</dt>
-                    <dd className="text-2xl font-semibold tabular-nums text-neutral-900">{s.platformShare.parts}%</dd>
-                    <dd className="text-xs text-neutral-500">Vendor keeps {s.vendorShare.parts}%</dd>
-                  </div>
-                  <p className="text-xs text-neutral-500 sm:col-span-2">
-                    {s.fromSettings ? "From Services settings." : "Services settings have no values, so these are the built-in defaults."} A booking taken directly by a worker pays the worker in full.
-                  </p>
-                </dl>
-              )}
             </section>
           ))
         )}
 
         <p className="text-xs text-neutral-500">
-          &ldquo;Effective&rdquo; is commission paid divided by the food or goods value of delivered orders in the last 30 days. It differs from the rate when a schedule ran, a rate changed, or a flat per-order rate applies.
+          &ldquo;Effective&rdquo; is commission paid divided by the food value of delivered orders in the last 30 days. It differs from the rate when a schedule ran, a rate changed, or a flat per-order rate applies.
         </p>
       </div>
     </div>

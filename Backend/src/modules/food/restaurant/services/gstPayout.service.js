@@ -96,7 +96,7 @@ export async function setRestaurantGstin(restaurantId, value, { actor = 'admin' 
         ? { gstNumber: gstin, gstRegistered: true }
         : { gstNumber: '', gstRegistered: false };
     // No GSTIN, no filing: a restaurant set to pay its own GST goes back to
-    // Quickdrops paying it.
+    // Azanto paying it.
     if (!gstin && restaurant.gstPayout === 'restaurant') {
         Object.assign(set, { gstPayout: 'platform', gstPayoutUpdatedAt: new Date(), gstPayoutUpdatedBy: String(actor || 'admin').slice(0, 120) });
     }

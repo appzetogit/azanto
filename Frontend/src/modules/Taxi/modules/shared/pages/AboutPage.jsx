@@ -50,7 +50,7 @@ const AboutPage = () => {
                 Driving the <span className="text-[#FFB300]">Future</span> of Mobility
             </h1>
             <p className="text-xl text-gray-400 leading-relaxed max-w-2xl mx-auto">
-                Quick Drop is a leading transportation and logistics platform dedicated to providing safe, reliable, and affordable mobility solutions for everyone.
+                Azanto is a leading transportation and logistics platform dedicated to providing safe, reliable, and affordable mobility solutions for everyone.
             </p>
         </div>
       </div>

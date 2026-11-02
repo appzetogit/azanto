@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@food
 
 const FIELDS = [
   { key: "batching.maxOrders", label: "Most orders on one trip", unit: "orders", min: 2, max: 3, step: 1 },
-  { key: "batching.pickupRadiusM", label: "Stores at most this far apart", unit: "metres", min: 0, max: 3000, step: 50, hint: "0 means the same store only." },
+  { key: "batching.pickupRadiusM", label: "Restaurants at most this far apart", unit: "metres", min: 0, max: 3000, step: 50, hint: "0 means the same restaurant only." },
   { key: "batching.dropRadiusKm", label: "Drops at most this far apart", unit: "km", min: 0.2, max: 15, step: 0.1 },
   { key: "batching.maxWaitMinutes", label: "Only within this long of the first order being accepted", unit: "minutes", min: 1, max: 60, step: 1, hint: "Keeps the first customer from waiting on a detour." },
 ]
@@ -80,7 +80,7 @@ export default function OrderBatching() {
             <Layers className="h-5 w-5" /> Order batching
           </h1>
           <p className="mt-1 text-sm text-neutral-600">
-            Give a rider who is on the way to a store a second Food, Quick or Medical order from the same or a nearby store,
+            Give a rider who is on the way to a restaurant a second Food order from the same or a nearby restaurant,
             going the same way. They pick both up together and deliver one after the other. Each order pays its own delivery fee.
           </p>
         </div>

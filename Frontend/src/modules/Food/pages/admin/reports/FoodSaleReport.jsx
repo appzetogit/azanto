@@ -217,7 +217,7 @@ export default function FoodSaleReport() {
       }
 
       doc.setFontSize(16)
-      doc.text("Quickdrops India – Food Sale Report", 10, 14)
+      doc.text("Azanto India – Food Sale Report", 10, 14)
       doc.setFontSize(9)
       doc.text(`Restaurant: ${restaurantLabel}    Period: ${periodLabel()}    Generated: ${new Date().toLocaleString("en-IN")}`, 10, 20)
 

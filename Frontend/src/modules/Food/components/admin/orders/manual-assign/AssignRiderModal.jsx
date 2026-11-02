@@ -22,7 +22,7 @@ const minutesUntil = (iso) => {
  * warnings (offline, on a trip, over the cash limit, far, location unknown)
  * nothing has changed yet and the operator confirms with "Assign anyway".
  */
-export default function AssignRiderModal({ open, onOpenChange, order, vertical, onAssigned }) {
+export default function AssignRiderModal({ open, onOpenChange, order, onAssigned }) {
   const orderId = orderKey(order)
   const displayId = order?.orderId || orderId
 
@@ -61,7 +61,7 @@ export default function AssignRiderModal({ open, onOpenChange, order, vertical, 
     setLoading(true)
     setError("")
     try {
-      const res = await adminAPI.getRiderCandidates(vertical, orderId, { q: effectiveQuery, limit: PAGE_SIZE })
+      const res = await adminAPI.getRiderCandidates(orderId, { q: effectiveQuery, limit: PAGE_SIZE })
       if (seq !== requestSeq.current) return
       const data = res?.data?.data || {}
       setRiders(Array.isArray(data.riders) ? data.riders : [])
@@ -74,7 +74,7 @@ export default function AssignRiderModal({ open, onOpenChange, order, vertical, 
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [open, orderId, vertical, effectiveQuery])
+  }, [open, orderId, effectiveQuery])
 
   useEffect(() => {
     loadRiders()
@@ -85,7 +85,7 @@ export default function AssignRiderModal({ open, onOpenChange, order, vertical, 
     setAssigningId(rider.id)
     setError("")
     try {
-      const res = await adminAPI.assignRider(vertical, orderId, { deliveryPartnerId: rider.id, force })
+      const res = await adminAPI.assignRider(orderId, { deliveryPartnerId: rider.id, force })
       const data = res?.data?.data || {}
       if (data.needsConfirmation) {
         setConfirm({ rider: data.rider || rider, warnings: Array.isArray(data.warnings) ? data.warnings : [] })

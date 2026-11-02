@@ -30,12 +30,12 @@ const legalContent = {
     title: 'Terms & Conditions',
     icon: ScrollText,
     intro:
-      'These Terms & Conditions govern the use of the Quick Drop website, app, and booking services. By using the platform, you agree to follow these terms whenever you browse, register, book, cancel, or pay for a service.',
+      'These Terms & Conditions govern the use of the Azanto website, app, and booking services. By using the platform, you agree to follow these terms whenever you browse, register, book, cancel, or pay for a service.',
     sections: [
       {
         title: 'Use of the platform',
         body:
-          'Quick Drop provides technology services for ride booking, vehicle-based transport support, parcel movement, and related mobility services. Availability can vary by city, vehicle type, demand, operating hours, and serviceability.',
+          'Azanto provides technology services for ride booking, vehicle-based transport support, parcel movement, and related mobility services. Availability can vary by city, vehicle type, demand, operating hours, and serviceability.',
       },
       {
         title: 'Eligibility',
@@ -65,12 +65,12 @@ const legalContent = {
       {
         title: 'Account actions',
         body:
-          'Quick Drop may suspend, restrict, or terminate access where there is fraud, abusive conduct, repeated policy violations, non-payment, chargeback misuse, or legal/regulatory risk.',
+          'Azanto may suspend, restrict, or terminate access where there is fraud, abusive conduct, repeated policy violations, non-payment, chargeback misuse, or legal/regulatory risk.',
       },
       {
         title: 'Liability and service interruptions',
         body:
-          'Quick Drop works to keep the service reliable, but delays may happen because of traffic, weather, technical downtime, route closures, law-and-order issues, or third-party failures. To the extent permitted by law, Quick Drop is not responsible for indirect or consequential loss arising from such interruptions.',
+          'Azanto works to keep the service reliable, but delays may happen because of traffic, weather, technical downtime, route closures, law-and-order issues, or third-party failures. To the extent permitted by law, Azanto is not responsible for indirect or consequential loss arising from such interruptions.',
       },
       {
         title: 'Contact',
@@ -84,7 +84,7 @@ const legalContent = {
     title: 'Privacy Policy',
     icon: ShieldCheck,
     intro:
-      'This website is managed by Quick Drop. This Privacy Policy explains what information we collect, why we collect it, how we use it, and the steps we take to protect it when you use the Quick Drop website or connected services.',
+      'This website is managed by Azanto. This Privacy Policy explains what information we collect, why we collect it, how we use it, and the steps we take to protect it when you use the Azanto website or connected services.',
     sections: [
       {
         title: 'Information we may collect',
@@ -112,7 +112,7 @@ const legalContent = {
       {
         title: 'Payments and data security',
         body:
-          'Payments may be processed through third-party payment partners. Quick Drop does not intentionally store full card data on the website. We use reasonable administrative and technical safeguards to protect user information, but no internet-based system can be guaranteed to be fully secure.',
+          'Payments may be processed through third-party payment partners. Azanto does not intentionally store full card data on the website. We use reasonable administrative and technical safeguards to protect user information, but no internet-based system can be guaranteed to be fully secure.',
       },
       {
         title: 'Data retention and user rights',
@@ -125,7 +125,7 @@ const legalContent = {
       {
         title: 'Policy updates',
         body:
-          'Quick Drop may revise this Privacy Policy from time to time. Continued use of the website after an update means you accept the revised policy.',
+          'Azanto may revise this Privacy Policy from time to time. Continued use of the website after an update means you accept the revised policy.',
       },
     ],
   },
@@ -134,7 +134,7 @@ const legalContent = {
     title: 'Refund & Cancellation Policy',
     icon: ReceiptText,
     intro:
-      'This page explains refund eligibility, cancellation timelines, and indicative prices for the main vehicle types available on the Quick Drop platform. Refunds are reviewed based on service status, time of cancellation, and payment mode.',
+      'This page explains refund eligibility, cancellation timelines, and indicative prices for the main vehicle types available on the Azanto platform. Refunds are reviewed based on service status, time of cancellation, and payment mode.',
     sections: [
       {
         title: 'When refunds may be approved',
@@ -148,7 +148,7 @@ const legalContent = {
       {
         title: 'Refund policy overview',
         body:
-          'Quick Drop reviews refund requests on a case-by-case basis to confirm whether the booking was completed, cancelled before service, cancelled after dispatch, or affected by a technical or payment issue. Approved refunds are returned only after internal verification of ride logs, payment status, and service records.',
+          'Azanto reviews refund requests on a case-by-case basis to confirm whether the booking was completed, cancelled before service, cancelled after dispatch, or affected by a technical or payment issue. Approved refunds are returned only after internal verification of ride logs, payment status, and service records.',
       },
       {
         title: 'Cancellation rules',
@@ -197,7 +197,7 @@ const legalContent = {
         bullets: [
           'Raise the issue through the support team with your booking ID, payment details, and reason for the request.',
           'Submit the request as early as possible after the cancelled or affected booking.',
-          'Quick Drop may ask for screenshots, transaction references, or additional verification before approval.',
+          'Azanto may ask for screenshots, transaction references, or additional verification before approval.',
         ],
       },
       {
@@ -216,7 +216,7 @@ const legalContent = {
     title: 'Cancellation Policy',
     icon: Scale,
     intro:
-      'This page summarizes how cancellations are handled across Quick Drop booking categories.',
+      'This page summarizes how cancellations are handled across Azanto booking categories.',
     sections: [
       {
         title: 'General policy',
@@ -251,7 +251,7 @@ const LegalPage = () => {
 
   useEffect(() => {
     if (content?.title) {
-      document.title = `${content.title} | Quick Drop`;
+      document.title = `${content.title} | Azanto`;
     }
   }, [content]);
 

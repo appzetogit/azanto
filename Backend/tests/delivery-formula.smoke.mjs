@@ -78,7 +78,7 @@ check('the settings registry validates through the same rules', () => {
 });
 
 console.log('\nSwitching over changes no price');
-// Quick Drop's live global table on 26 Sep 2026: 0-2 km flat 25, 2-15 km 10/km.
+// Azanto's live global table on 26 Sep 2026: 0-2 km flat 25, 2-15 km 10/km.
 const live = [
   { distanceRuleId: 'a', minDistance: 0, maxDistance: 2, userDeliveryFee: 25, commissionPerKm: 0, basePayout: 0, extraPerKm: 0 },
   { distanceRuleId: 'b', minDistance: 2, maxDistance: 15, userDeliveryFee: 0, commissionPerKm: 10, basePayout: 0, extraPerKm: 0 },

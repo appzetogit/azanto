@@ -6,8 +6,8 @@ import apiClient from "@food/api/axios"
 /*
  * Master > Restaurant GST: for each restaurant, who pays the GST on its food.
  *
- *   Quickdrops pays  -- the restaurant is paid without the GST; Quickdrops
- *                       remits it (and it is in "GST Quickdrops owes" below).
+ *   Azanto pays  -- the restaurant is paid without the GST; Azanto
+ *                       remits it (and it is in "GST Azanto owes" below).
  *   Restaurant pays  -- the GST is paid to the restaurant with its payout and
  *                       it files it. Needs a GSTIN.
  *
@@ -30,7 +30,7 @@ const dayInput = (d) => {
 
 function Choice({ value, decided, hasGstin, busy, onChoose }) {
   const options = [
-    { key: "platform", label: "Quickdrops pays" },
+    { key: "platform", label: "Azanto pays" },
     { key: "restaurant", label: "Restaurant pays" },
   ]
   return (
@@ -199,7 +199,7 @@ function GstTotals() {
             {[
               ["Delivered orders", String(t.orders)],
               ["GST on food", rupees(t.gstOnFood)],
-              ["GST Quickdrops owes", rupees(t.owedByPlatform)],
+              ["GST Azanto owes", rupees(t.owedByPlatform)],
               ["GST paid to restaurants", rupees(t.paidToRestaurants)],
             ].map(([label, value]) => (
               <div key={label} className="bg-white px-4 py-3">
@@ -216,7 +216,7 @@ function GstTotals() {
                     <th className="px-4 py-2">Restaurant</th>
                     <th className="px-4 py-2 text-right">Orders</th>
                     <th className="px-4 py-2 text-right">GST on food</th>
-                    <th className="px-4 py-2 text-right">Quickdrops owes</th>
+                    <th className="px-4 py-2 text-right">Azanto owes</th>
                     <th className="px-4 py-2 text-right">Paid to restaurant</th>
                   </tr>
                 </thead>
@@ -283,7 +283,7 @@ export default function MasterRestaurantGst() {
       toast.success(
         gstPayout === "restaurant"
           ? `${r.restaurantName}: GST paid to the restaurant on new orders`
-          : `${r.restaurantName}: Quickdrops pays the GST on new orders`,
+          : `${r.restaurantName}: Azanto pays the GST on new orders`,
       )
     } catch (err) {
       toast.error(apiError(err, "Could not save"))
@@ -298,8 +298,8 @@ export default function MasterRestaurantGst() {
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Restaurant GST</h1>
           <p className="max-w-2xl text-sm text-neutral-500">
-            Who pays the GST on each restaurant&apos;s food. <b className="font-medium text-neutral-700">Quickdrops pays</b>: the
-            restaurant is paid without it and Quickdrops pays it to the government.{" "}
+            Who pays the GST on each restaurant&apos;s food. <b className="font-medium text-neutral-700">Azanto pays</b>: the
+            restaurant is paid without it and Azanto pays it to the government.{" "}
             <b className="font-medium text-neutral-700">Restaurant pays</b>: it is paid to the restaurant with its payout and it
             files it. Changes apply to orders placed from then on; the restaurant cannot change this.
           </p>
@@ -308,7 +308,7 @@ export default function MasterRestaurantGst() {
         <div className="rounded-lg border border-neutral-200 bg-white">
           <div className="flex flex-wrap items-center gap-3 border-b border-neutral-100 p-3 text-sm text-neutral-600">
             <span>
-              {counts.platform} Quickdrops pays · {counts.restaurant} restaurant pays
+              {counts.platform} Azanto pays · {counts.restaurant} restaurant pays
             </span>
             <div className="relative ml-auto w-full sm:w-64">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400" />

@@ -307,7 +307,7 @@ console.log('\nclearing it');
 /*
  * Changed on 24 Sep 2026: a restaurant with no radius of its own used to serve
  * its whole zone, so the admin's radius bound only the few that set one (six of
- * seven on Quick Drop set none). It now falls back to the platform radius.
+ * seven on Azanto set none). It now falls back to the platform radius.
  */
 await check('clearing the radius falls back to the platform radius', async () => {
     await radius.setRestaurantServiceRadius(tenKm._id, null, { actor: 'restaurant' });

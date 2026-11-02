@@ -26,7 +26,7 @@ const BlogPage = () => {
     },
     {
       id: 3,
-      title: "Why Parcel Delivery is Faster with Quick Drop",
+      title: "Why Parcel Delivery is Faster with Azanto",
       excerpt: "We've optimized our routing algorithms to ensure your packages arrive faster and safer than ever before.",
       author: "Logistics",
       date: "April 20, 2026",

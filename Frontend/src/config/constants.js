@@ -1,12 +1,11 @@
 export const APP_CONFIG = {
-  NAME: 'Quick Drop',
+  NAME: 'Azanto',
   VERSION: '1.0.0',
 };
 
 export const MODULES = {
   FOOD: 'Food',
   TAXI: 'taxi',
-  QUICK_COMMERCE: 'quickCommerce',
 };
 
 export const ROLES = {

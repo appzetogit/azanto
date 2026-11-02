@@ -21,8 +21,8 @@ const formatCurrency = (amount) => {
 const CAPABILITY_GROUPS = [
   {
     key: 'delivery_group',
-    label: 'Food + Quick Commerce + Medical + Bike Porter',
-    caps: ['delivery', 'quickCommerce', 'parcel'],
+    label: 'Food + Bike Porter',
+    caps: ['delivery', 'parcel'],
   },
   {
     key: 'taxi_group',

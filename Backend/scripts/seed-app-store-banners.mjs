@@ -1,5 +1,5 @@
 /**
- * Fill every EMPTY banner slot with the Quick Drop artwork in
+ * Fill every EMPTY banner slot with the Azanto artwork in
  * scripts/app-store-banners/ -- a temporary set for App Store review.
  *
  * The artwork is original vector art: no third-party names, logos, vehicle

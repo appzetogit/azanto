@@ -14,7 +14,7 @@ import { logger } from '../utils/logger.js';
  * ClientSession become no-ops and withTransaction just runs its callback: each
  * write still happens, in order, but without all-or-nothing rollback -- the
  * same trade the Services module already makes there (utils/withTransaction.js).
- * Replica sets (Quick Drop's Atlas cluster) are untouched and keep full
+ * Replica sets (Azanto's Atlas cluster) are untouched and keep full
  * transactions. The durable fix is a single-node replica set on that server.
  */
 let patched = false;

@@ -36,7 +36,7 @@ function useCountdown(deadline) {
  *   declined -- "Declined by X: reason — back to auto-dispatch"
  * Renders nothing when there is no manual assignment to talk about.
  */
-export default function ManualAssignStatus({ order, vertical, onChanged, compact = false }) {
+export default function ManualAssignStatus({ order, onChanged, compact = false }) {
   const state = describeManualAssignment(order)
   const left = useCountdown(state.kind === "pending" ? state.deadline : null)
   const [unassigning, setUnassigning] = useState(false)
@@ -49,7 +49,7 @@ export default function ManualAssignStatus({ order, vertical, onChanged, compact
     if (!window.confirm(`Take this order back from ${who}? It goes back to auto-dispatch.`)) return
     setUnassigning(true)
     try {
-      await adminAPI.unassignRider(vertical, orderKey(order))
+      await adminAPI.unassignRider(orderKey(order))
       toast.success(`Unassigned ${who} — back to auto-dispatch`)
       onChanged?.()
     } catch (err) {

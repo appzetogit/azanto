@@ -12,7 +12,6 @@ import { Badge } from "@food/components/ui/badge";
 import { Avatar, AvatarFallback } from "@food/components/ui/avatar";
 import foodIcon from "@food/assets/category-icons/food.png.png";
 import taxiIcon from "@food/assets/category-icons/taxi.png.png";
-import quickIcon from "@food/assets/category-icons/quick.png";
 import hotelIcon from "@food/assets/category-icons/hotel.png";
 import burgerAvatar from "@food/assets/burger_avatar.png";
 import dalTadka from "@food/assets/menu-items/dal_tadka_1771226053751.png";
@@ -121,7 +120,6 @@ export default function HomeHeader({
 
   const festCategories = [
     { id: "food", name: "Food", icon: foodIcon, bgColor: "bg-white dark:bg-[#1a1a1a]" },
-    { id: "quick", name: "Quick", icon: quickIcon, bgColor: "bg-white dark:bg-[#1a1a1a]" },
     { id: "taxi", name: "Taxi", icon: taxiIcon, bgColor: "bg-white dark:bg-[#1a1a1a]" },
     { id: "hotel", name: "Hotel", icon: hotelIcon, bgColor: "bg-white dark:bg-[#1a1a1a]" },
   ];

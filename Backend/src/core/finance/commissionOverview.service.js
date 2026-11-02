@@ -32,6 +32,8 @@ const SERVICES = {
   services: { label: 'Services', service: 'serviceProvider', resource: 'settings', editPath: '/admin/sp/settings' },
 };
 
+const ACTIVE_SERVICES = new Set(['food', 'taxi']);
+
 const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const coll = (name) => mongoose.connection.collection(name);
 const canSee = (admin, key) =>
@@ -178,7 +180,9 @@ function summarise(rows = []) {
 }
 
 export async function commissionOverview(admin) {
-  const keys = Object.keys(SERVICES).filter((k) => canSee(admin, k));
+  // Food and taxi only: quick commerce and service-provider are switched off (the
+  // product is food + taxi only), and their editPaths lead to panels that are gone.
+  const keys = Object.keys(SERVICES).filter((k) => ACTIVE_SERVICES.has(k) && canSee(admin, k));
   if (!keys.length) throw new ApiError(403, 'You do not have access to commission settings');
   const since = new Date(Date.now() - DAYS * 24 * 3600 * 1000);
   const services = [];

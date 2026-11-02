@@ -7,8 +7,8 @@ import { getModuleToken } from "@food/utils/auth"
  * Live dispatch events for the admin panel.
  *
  * Admin sockets are auto-joined to `admin:all` by the server once the handshake
- * carries the admin token. Food events come on the root namespace, Quick and
- * Medical on `/qc`. One socket per namespace is shared by every component that
+ * carries the admin token. Food events come on the root namespace. One socket
+ * is shared by every component that
  * listens (a list plus an open dialog do not open two connections), and it is
  * closed a moment after the last listener leaves.
  *
@@ -31,8 +31,6 @@ const socketOrigin = () => {
   }
 }
 
-const namespaceFor = (vertical) => (vertical === "quickCommerce" ? "/qc" : "")
-
 const notifyStatus = (channel) => {
   channel.statusListeners.forEach((fn) => {
     try {
@@ -43,8 +41,8 @@ const notifyStatus = (channel) => {
   })
 }
 
-const acquire = (vertical) => {
-  const ns = namespaceFor(vertical)
+const acquire = () => {
+  const ns = ""
   let channel = channels.get(ns)
   if (channel) {
     if (channel.releaseTimer) {
@@ -118,12 +116,11 @@ const release = (channel) => {
 }
 
 /**
- * @param {'food'|'quickCommerce'} vertical
  * @param {(eventName: string, payload: object) => void} onEvent
  * @param {{ enabled?: boolean }} [options]
  * @returns {{ connected: boolean }}
  */
-export function useAdminDispatchSocket(vertical, onEvent, { enabled = true } = {}) {
+export function useAdminDispatchSocket(onEvent, { enabled = true } = {}) {
   const handlerRef = useRef(onEvent)
   const [connected, setConnected] = useState(false)
 
@@ -136,7 +133,7 @@ export function useAdminDispatchSocket(vertical, onEvent, { enabled = true } = {
       setConnected(false)
       return undefined
     }
-    const channel = acquire(vertical)
+    const channel = acquire()
     const listener = (eventName, payload) => handlerRef.current?.(eventName, payload)
     channel.listeners.add(listener)
     channel.statusListeners.add(setConnected)
@@ -146,7 +143,7 @@ export function useAdminDispatchSocket(vertical, onEvent, { enabled = true } = {
       channel.statusListeners.delete(setConnected)
       release(channel)
     }
-  }, [vertical, enabled])
+  }, [enabled])
 
   return { connected }
 }

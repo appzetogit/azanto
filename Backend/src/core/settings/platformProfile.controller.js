@@ -67,7 +67,7 @@ export const testEmailController = async (req, res) => {
     await transport.verify();
     const to = String(b.sendTo || '').trim();
     if (to) {
-      await transport.sendMail({ from: pick(b.from, m.from) || user, to, subject: 'Quick Drop: test email', text: 'Your mail settings work.' });
+      await transport.sendMail({ from: pick(b.from, m.from) || user, to, subject: 'Azanto: test email', text: 'Your mail settings work.' });
       return sendResponse(res, 200, `Connected, and a test email was sent to ${to}`, { ok: true });
     }
     return sendResponse(res, 200, 'Connected to the mail server', { ok: true });

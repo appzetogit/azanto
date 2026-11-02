@@ -44,7 +44,7 @@ const DRIVER_PLACEHOLDER = { name: 'Delivery Captain', rating: '4.9', vehicle: '
 const STAGES = { SEARCHING: 'searching', ACCEPTED: 'accepted' };
 const ACTIVE_DELIVERY_POLL_MS = 1500;
 const SEARCH_TIMEOUT_MS = 20000;
-const CONSUMED_SEARCH_NONCE_PREFIX = 'Quick Drop_consumed_parcel_search_nonce:';
+const CONSUMED_SEARCH_NONCE_PREFIX = 'azanto_consumed_parcel_search_nonce:';
 const ACTIVE_SEARCH_NONCES = new Set();
 const ACTIVE_SEARCH_NONCE_CLEANUPS = new Map();
 

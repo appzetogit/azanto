@@ -64,7 +64,7 @@ const normalizeOtpScope = (scope) => {
 /** The wording this file used to hard-code. Kept as the fallback, so an unset
  *  SMS_INDIA_HUB_TEMPLATE_TEXT changes nothing about what is sent. */
 export const DEFAULT_OTP_SMS_TEMPLATE =
-    'Welcome to the Quick Drop powered by SMSINDIAHUB. Your OTP for registration is {{OTP}}';
+    'Welcome to the Azanto powered by SMSINDIAHUB. Your OTP for registration is {{OTP}}';
 
 /**
  * The message body, rendered from the DLT-registered template.

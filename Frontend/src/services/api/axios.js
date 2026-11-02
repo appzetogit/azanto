@@ -233,7 +233,6 @@ function clearModuleAuth(module) {
     localStorage.removeItem(`${module}_refreshToken`);
     localStorage.removeItem(`${module}_authenticated`);
     localStorage.removeItem(`${module}_user`);
-    if (module === "restaurant") localStorage.removeItem(RESTAURANT_VERTICAL_KEY);
     if (module === "admin") localStorage.removeItem("admin_access");
     if (module === "user") {
       localStorage.removeItem("accessToken");
@@ -300,149 +299,9 @@ function onRefreshFailed(module) {
   }
 }
 
-/**
- * Point the admin screens at quick-commerce when they are being viewed there.
- *
- * /admin/food and /admin/quick-commerce render the SAME components (see AdminRouter),
- * because quick-commerce is a fork of this repo's food module and its admin API is the
- * identical route table under /v1/qc/admin. Rather than thread a prefix through the
- * ~150 call sites in services/api, the swap happens here, once.
- *
- * Derived from the current URL rather than held in a module variable on purpose: a
- * mutable global would have to be kept in step with client-side navigation, and would
- * be wrong for any request already in flight when the admin switches vertical.
- *
- * The WHOLE /food namespace moves, not just /food/admin. quick-commerce mounts the
- * same routers master mounts under /v1/food -- admin, restaurant, delivery, orders,
- * user, notifications, search, dining and the landing router that owns hero-banners --
- * so /food/<x> and /qc/<x> are the same endpoint in two verticals.
- *
- * Rewriting only /food/admin (as this first did) left every other screen writing into
- * food while the operator was looking at quick-commerce. Banner uploads were the
- * visible case -- they post to /food/showcase-items/multiple, which is not under
- * /food/admin -- but restaurants, delivery, zones and orders had the same fault.
- *
- * EXCEPT auth: /food/auth/* stays pointed at the platform so one login covers every
- * vertical. That exclusion is the reason this is a negative-lookahead rather than a
- * blanket replace.
- */
-const SHARED_FOOD_PREFIXES = ["auth"];
-
-/**
- * The admin bases that speak to the quick-commerce API.
- *
- * Medical is not a fifth vertical: a pharmacy is a quick-commerce seller whose
- * storeType is 'pharmacy', so /admin/medical is these same screens on the same
- * API, narrowed to that one type. `scope` is what narrows them.
- */
-const QC_ADMIN_BASES = [
-  // "quick": every store type but pharmacy -- medical stores have their own
-  // panel and must not be listed (or edited by mistake) under Quick Commerce.
-  { base: "/admin/quick-commerce", scope: "quick" },
-  { base: "/admin/medical", scope: "pharmacy" },
-];
-
-const currentQcBase = () => {
-  if (typeof window === "undefined") return null;
-  const path = window.location.pathname;
-  return QC_ADMIN_BASES.find((entry) => path.startsWith(entry.base)) || null;
-};
-
-/*
- * Stores and medical stores use the restaurant web dashboard.
- *
- * They are quick-commerce sellers: the same seller endpoints under /qc instead
- * of /food, which is exactly how the Partner app serves them. The /partner
- * sign-in marks the session; every restaurant-panel request then goes to /qc,
- * token refresh included. A normal restaurant login clears the mark
- * (setAuthData), as does signing out.
- */
-export const RESTAURANT_VERTICAL_KEY = "restaurant_vertical"
-const restaurantOnQc = () => {
-  try {
-    return localStorage.getItem(RESTAURANT_VERTICAL_KEY) === "qc"
-  } catch {
-    return false
-  }
-}
-
-const rewriteAdminVertical = (url) => {
-  if (typeof url !== "string" || !url) return url;
-  if (!currentQcBase()) return url;
-  const shared = SHARED_FOOD_PREFIXES.join("|");
-  return url.replace(new RegExp(`(^|/)food/(?!(?:${shared})(?:/|$))`), "$1qc/");
-};
-
-/**
- * Narrow every admin read to the store type the panel is showing.
- *
- * Sent as a request parameter rather than filtered in the browser: the lists
- * are paginated server-side, so filtering the page after it arrives would show
- * "20 sellers" of which three are pharmacies, and page two might hold none. The
- * server refuses a store type it does not know, so a typo here fails loudly
- * instead of quietly widening the list back to every seller.
- *
- * Writes are left alone. They address one record by id, which is already
- * scoped by what the operator could see and click.
- */
-/*
- * Zones are the one thing quick commerce and medical do NOT share.
- *
- * Everywhere else /admin/medical is quick commerce narrowed to pharmacies, so
- * a storeType parameter on reads is enough. Zones are their own collections --
- * a zone drawn for groceries must not decide where medicine can go -- and the
- * server cannot tell which panel is asking, because both render the same screen
- * against the same route.
- *
- * So the vertical is sent on EVERY zone call, writes included: creating,
- * renaming and deleting all have to land in the right map, and a write is
- * exactly where getting it wrong is permanent. In the query for reads and
- * deletes, in the body for the rest, because that is where each already carries
- * its payload.
- */
-const ZONE_PATH = /(^|\/)(qc|food)\/admin\/zones(\/|$|\?)/;
-
-const applyZoneVertical = (config) => {
-  const entry = currentQcBase();
-  if (!entry) return config;
-  if (!ZONE_PATH.test(String(config.url || ""))) return config;
-
-  const vertical = entry.base === "/admin/medical" ? "medical" : "quick";
-  const method = String(config.method || "get").toLowerCase();
-
-  config.params = { ...(config.params || {}), vertical };
-  if (method === "post" || method === "patch" || method === "put") {
-    if (config.data && typeof config.data === "object" && !(config.data instanceof FormData)) {
-      config.data = { ...config.data, vertical };
-    }
-  }
-  return config;
-};
-
-const applyVerticalScope = (config) => {
-  const entry = currentQcBase();
-  if (!entry?.scope) return config;
-  const method = String(config.method || "get").toLowerCase();
-  if (method !== "get") return config;
-  // An explicit storeType from a screen wins: a medical screen may legitimately
-  // ask a narrower question, and overriding it here would answer a different one.
-  const params = config.params || {};
-  if (params.storeType === undefined) {
-    config.params = { ...params, storeType: entry.scope };
-  }
-  return config;
-};
-
 apiClient.interceptors.request.use(
   (config) => {
-    config.url = rewriteAdminVertical(config.url);
-    applyVerticalScope(config);
-    // After the rewrite, so the path it matches is the one actually being sent.
-    applyZoneVertical(config);
     config.contextModule = getModuleFromConfig(config);
-    if (config.contextModule === "restaurant" && restaurantOnQc() && typeof config.url === "string") {
-      config.url = config.url.replace(/(^|\/)food\//, "$1qc/");
-    }
 
     // If sending FormData, let the browser set proper multipart boundary.
     if (config.data instanceof FormData) {
@@ -512,9 +371,7 @@ apiClient.interceptors.response.use(
     try {
       // Use relative URL so this works both with an explicit baseURL and with a dev proxy.
       // Use plain axios to avoid interceptor recursion.
-      // A store's session was issued by quick commerce, so it refreshes there.
-      const authPrefix = module === "restaurant" && restaurantOnQc() ? "qc" : "food";
-      const refreshUrl = baseURL ? `${baseURL}/${authPrefix}/auth/refresh-token` : `/api/v1/${authPrefix}/auth/refresh-token`;
+      const refreshUrl = baseURL ? `${baseURL}/food/auth/refresh-token` : "/api/v1/food/auth/refresh-token";
       const { data } = await postRefreshWithRetry(refreshUrl, refreshToken);
       const newAccessToken = data?.data?.accessToken || data?.accessToken;
       if (newAccessToken) {

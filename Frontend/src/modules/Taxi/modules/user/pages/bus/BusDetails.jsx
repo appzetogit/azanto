@@ -572,7 +572,7 @@ const BusDetails = () => {
             {/* UPI QR Code Image */}
             <div className="mx-auto w-48 h-48 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center overflow-hidden p-2">
               <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=test@upi&pn=QuickDrop&am=${mockQrOrder.amount / 100}&tn=BusBooking_${mockQrOrder.orderId}`)}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=test@upi&pn=Azanto&am=${mockQrOrder.amount / 100}&tn=BusBooking_${mockQrOrder.orderId}`)}`}
                 alt="UPI Payment QR Code" 
                 className="w-full h-full object-contain"
               />
@@ -590,7 +590,7 @@ const BusDetails = () => {
 
             <div className="space-y-2 pt-2">
               <a
-                href={`upi://pay?pa=test@upi&pn=QuickDrop&am=${mockQrOrder.amount / 100}&tn=BusBooking_${mockQrOrder.orderId}`}
+                href={`upi://pay?pa=test@upi&pn=Azanto&am=${mockQrOrder.amount / 100}&tn=BusBooking_${mockQrOrder.orderId}`}
                 className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2"
               >
                 Pay via UPI App Directly

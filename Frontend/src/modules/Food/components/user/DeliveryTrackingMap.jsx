@@ -11,7 +11,7 @@ import {
 import io from 'socket.io-client';
 import { API_BASE_URL } from '@food/api/config';
 import bikeLogo from '@food/assets/bikelogo.png';
-import k9Logo from '@food/assets/k9-logo.jpg';
+import k9Logo from '@food/assets/azanto-logo.png';
 import { subscribeOrderTracking } from '@food/realtimeTracking';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Navigation, Info, Circle } from 'lucide-react';
@@ -561,7 +561,7 @@ const DeliveryTrackingMap = ({
               <div className="relative w-11 h-11 rounded-full bg-white shadow-xl border-[3px] border-amber-500 flex items-center justify-center overflow-hidden">
                 <img 
                   src={k9Logo}
-                  alt="Quick Drop"
+                  alt="Azanto"
                   className="w-full h-full object-cover"
                 />
               </div>

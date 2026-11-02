@@ -8,11 +8,10 @@ import { useAdminAccess, isRestricted, can, hasPanel } from "@food/utils/adminAc
 
 /**
  * Master > Platform Fee & GST: the platform fee on an order, and the GST on it,
- * set once for Food and Quick & Medical (core/finance/platformFees.service.js).
+ * set once for Food (core/finance/platformFees.service.js).
  *
  * Empty keeps each service's own fee setting, which is how it worked before.
- * GST on the platform fee is charged by Food and, since 2026-09-28, by Quick &
- * Medical too, at the rate set here (unset for Quick & Medical = not charged).
+ * GST on the platform fee is charged by Food at the rate set here.
  */
 
 const KEYS = { platformFee: "fees.platformFee", platformFeeGstRate: "fees.platformFeeGstRate" }
@@ -20,15 +19,13 @@ const KEYS = { platformFee: "fees.platformFee", platformFeeGstRate: "fees.platfo
 const SCOPES = [
   { id: "*", level: "global", label: "All services" },
   { id: "food", level: "vertical", label: "Food" },
-  { id: "quickCommerce", level: "vertical", label: "Quick & Medical" },
 ]
-const SERVICE_LABEL = { food: "Food", quickCommerce: "Quick & Medical" }
-// Whose zones each tab's zone picker lists. A pharmacy order carries a Medical zone.
-const ZONE_MODULES = { "*": ["food", "quickCommerce", "medical"], food: ["food"], quickCommerce: ["quickCommerce", "medical"] }
+const SERVICE_LABEL = { food: "Food" }
+// Whose zones each tab's zone picker lists.
+const ZONE_MODULES = { "*": ["food"], food: ["food"] }
 
 const OWN_SCREENS = [
   { label: "Food fee settings", path: "/admin/food/fee-settings" },
-  { label: "Quick & Medical fee settings", path: "/admin/quick-commerce/fee-settings" },
   { label: "Taxi platform fee (per vehicle)", path: "/taxi/admin/pricing/set-price" },
 ]
 
@@ -90,7 +87,7 @@ export default function MasterFees() {
   const access = useAdminAccess()
   const limited = isRestricted(access)
   const visibleScopes = limited
-    ? SCOPES.filter((s) => s.id !== "*" && (s.id === "quickCommerce" ? hasPanel(access, "quickCommerce") || hasPanel(access, "medical") : hasPanel(access, s.id)))
+    ? SCOPES.filter((s) => s.id !== "*" && hasPanel(access, s.id))
     : SCOPES
   useEffect(() => {
     if (limited && visibleScopes.length && !visibleScopes.some((s) => s.id === scopeId)) setScopeId(visibleScopes[0].id)
@@ -98,7 +95,6 @@ export default function MasterFees() {
   }, [limited, visibleScopes.length, scopeId])
 
   const scope = SCOPES.find((s) => s.id === scopeId) || SCOPES[0]
-  const isQuick = scopeId === "quickCommerce"
   // A zone of the current service, or none: the service's own value.
   const [zone, setZone] = useState({ id: "", name: "" })
   const target = zone.id
@@ -155,7 +151,7 @@ export default function MasterFees() {
       <div className="mx-auto max-w-3xl space-y-5">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Platform fee &amp; GST</h1>
-          <p className="mt-1 text-sm text-neutral-600">The fee added to every order, set once for Food and Quick &amp; Medical.</p>
+          <p className="mt-1 text-sm text-neutral-600">The fee added to every order, set once for Food.</p>
         </div>
 
         <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
@@ -253,7 +249,7 @@ export default function MasterFees() {
               <h2 className="font-semibold text-neutral-900">{scope.id === "*" ? "For every service" : `Only for ${target.label}`}</h2>
               <p className="mt-0.5 text-sm text-neutral-500">
                 {scope.id === "*"
-                  ? "Applies to Food and Quick & Medical unless a service has its own value in its tab."
+                  ? "Applies to Food unless it has its own value in its tab."
                   : zone.id
                     ? `Overrides ${scope.label}'s value for orders in ${zone.name} only. Leave empty to use ${scope.label}'s.`
                     : `Overrides the "All services" value for ${scope.label}. Leave empty to use it.`}
@@ -287,13 +283,12 @@ export default function MasterFees() {
                 />
                 <Row
                   label="GST on the platform fee"
-                  hint="Added on top of the platform fee, on Food and Quick & Medical orders."
+                  hint="Added on top of the platform fee, on Food orders."
                   value={values.platformFeeGstRate}
                   onChange={(v) => setValues((c) => ({ ...c, platformFeeGstRate: v }))}
                   suffix="%"
                   max={100}
                   disabled={saving}
-                  note={isQuick ? "Also applies to Medical (pharmacy) orders." : ""}
                 />
               </div>
             )}

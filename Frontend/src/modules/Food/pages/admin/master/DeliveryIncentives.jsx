@@ -14,7 +14,7 @@ import TablePagination, { usePagination, SCROLL_TABLE_CLASS, STICKY_THEAD_CLASS 
  *
  * Two segments, not per-module tabs like Delivery Earnings — a rider works
  * one of two duty segments at a time (the Flutter app's DutySegment), and
- * both food+quick-commerce+medical riders and taxi+porter riders share one
+ * both food riders and taxi+porter riders share one
  * ladder within their segment. Saving inserts a new active rule and
  * deactivates whichever was active for that segment before it (server-side,
  * see incentiveRule.model.js) — this screen never edits a rule in place, so
@@ -24,11 +24,11 @@ import TablePagination, { usePagination, SCROLL_TABLE_CLASS, STICKY_THEAD_CLASS 
 const SEGMENTS = [
   {
     id: "foodAndQuick",
-    label: "Food, Daily needs, Medical & Bike parcel",
-    hint: "Food + Daily needs + Medical + Bike parcel riders — food, groceries, medicine and parcels on a 2-wheeler all count toward the same ladder.",
-    // A zone ladder can be for a Food, Quick or Medical zone: whichever the order
-    // (or the bike parcel's pickup) is in.
-    zoneModules: ["food", "quickCommerce", "medical"],
+    label: "Food & Bike parcel",
+    hint: "Food + Bike parcel riders — food and parcels on a 2-wheeler all count toward the same ladder.",
+    // A zone ladder is for a Food zone: whichever the order (or the bike
+    // parcel's pickup) is in.
+    zoneModules: ["food"],
   },
   {
     // Key kept for the ladders already saved; passenger rides only now.

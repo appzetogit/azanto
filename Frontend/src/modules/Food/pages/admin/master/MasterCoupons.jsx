@@ -24,12 +24,10 @@ const STATE = Object.fromEntries(STATES.map((s) => [s.key, s]))
 
 const CREATE_LINKS = [
   { label: "Food coupon", path: "/admin/food/coupons" },
-  { label: "Quick & Medical coupon", path: "/admin/quick-commerce/coupons" },
   { label: "Taxi promo code", path: "/taxi/admin/promotions/promo-codes" },
 ]
 const EDIT_PATH = {
   food: "/admin/food/coupons",
-  quick: "/admin/quick-commerce/coupons",
   taxi: "/taxi/admin/promotions/promo-codes",
 }
 
@@ -117,7 +115,7 @@ export default function MasterCoupons() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-neutral-900">Coupons</h1>
-            <p className="mt-1 text-sm text-neutral-600">Every coupon and promo code in Food, Quick &amp; Medical and Taxi.</p>
+            <p className="mt-1 text-sm text-neutral-600">Every coupon and promo code in Food and Taxi.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button

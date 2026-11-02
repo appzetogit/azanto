@@ -9,10 +9,6 @@ import { BarChart3, Boxes, Building2, ChevronLeft, ChevronRight, ClipboardList, 
  * existing bottom nav.
  */
 
-const isQcStore = () => {
-  try { return localStorage.getItem("restaurant_vertical") === "qc" } catch { return false }
-}
-
 const getNavSections = (base) => [
   {
     label: "OPERATIONS",
@@ -21,8 +17,6 @@ const getNavSections = (base) => [
       { label: "All orders", path: `${base}/orders/all`, icon: Clock },
       { label: "Inventory", path: `${base}/inventory`, icon: Package },
       { label: "Menu overview", path: `${base}/menu-overview`, icon: ClipboardList },
-      // Stores and medical stores count stock per size; restaurants do not.
-      ...(isQcStore() ? [{ label: "Stock", path: `${base}/stock`, icon: Boxes }] : []),
       { label: "Menu categories", path: `${base}/menu-categories`, icon: Utensils },
       { label: "Reservations", path: `${base}/reservations`, icon: Store },
     ],

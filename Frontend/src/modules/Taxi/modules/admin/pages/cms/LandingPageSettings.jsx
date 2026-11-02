@@ -478,7 +478,7 @@ const LandingPageSettings = ({ defaultTab = 'general', defaultPage = 'about_us' 
                     <textarea
                       value={settings.hero_description || ''}
                       onChange={(e) => handleChange('hero_description', e.target.value)}
-                      placeholder="Quick Drop is the multi-service super-app..."
+                      placeholder="Azanto is the multi-service super-app..."
                       rows={3}
                       className="w-full border border-gray-200 rounded-lg p-4 text-sm text-gray-800 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors shadow-sm resize-y"
                     />

@@ -50,7 +50,7 @@ const parseDataUrl = (dataUrl) => {
  * takes the same shape, but only letters, numbers, `_`, `-` and `/`.
  *
  * Cloudinary allowed more, and taxi's folders were built on that: the default
- * CLOUDINARY_FOLDER is "Quick Drop-taxi", with a space, so every taxi upload was
+ * CLOUDINARY_FOLDER is "azanto-taxi", with a space, so every taxi upload was
  * refused ("Folder may only contain letters, numbers, /, _, and -") once these
  * helpers moved to local storage. Each segment is cleaned instead -- anything
  * else becomes `-` -- and `.`/`..` segments are dropped, so a caller's folder

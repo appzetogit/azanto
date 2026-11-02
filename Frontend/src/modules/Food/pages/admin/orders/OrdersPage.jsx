@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import { useLocation, useSearchParams } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import io from "socket.io-client"
 import { FileText, Calendar, Package } from "lucide-react"
 import { adminAPI } from "@food/api"
@@ -16,7 +16,6 @@ import AssignRiderButton from "@food/components/admin/orders/manual-assign/Assig
 import ManualAssignStatus from "@food/components/admin/orders/manual-assign/ManualAssignStatus"
 import { useAdminDispatchSocket } from "@food/components/admin/orders/manual-assign/useAdminDispatchSocket"
 import {
-  adminVerticalFromPath,
   eventMatchesOrder,
   isManualPending,
   withLiveEvent,
@@ -685,13 +684,11 @@ export default function OrdersPage({ statusKey = "all" }) {
 
   /*
    * Manual rider assignment: live from the admin socket (Food on the root
-   * namespace, Quick & Medical on /qc). A matching event is shown at once and
+   * namespace). A matching event is shown at once and
    * the page re-read shortly after, debounced so a burst is one request. With
    * no socket, the page re-reads every 10s -- only while some order on it is
    * waiting on a hand-picked rider, and not on "all", which already polls.
    */
-  const { pathname } = useLocation()
-  const assignVertical = adminVerticalFromPath(pathname)
   const ordersRef = useRef([])
   useEffect(() => {
     ordersRef.current = normalizedOrders
@@ -716,7 +713,7 @@ export default function OrdersPage({ statusKey = "all" }) {
     scheduleAssignRefetch()
   }, [scheduleAssignRefetch])
 
-  const { connected: dispatchSocketConnected } = useAdminDispatchSocket(assignVertical, handleDispatchEvent)
+  const { connected: dispatchSocketConnected } = useAdminDispatchSocket(handleDispatchEvent)
 
   const hasPendingManualAssign = useMemo(
     () => normalizedOrders.some((order) => isManualPending(order)),
@@ -743,17 +740,17 @@ export default function OrdersPage({ statusKey = "all" }) {
   const renderAssignStatus = useCallback(
     (order) => (
       <div className="max-w-xs">
-        <ManualAssignStatus order={withLive(order)} vertical={assignVertical} onChanged={refreshAfterAssign} compact />
+        <ManualAssignStatus order={withLive(order)} onChanged={refreshAfterAssign} compact />
       </div>
     ),
-    [withLive, assignVertical, refreshAfterAssign],
+    [withLive, refreshAfterAssign],
   )
 
   const renderAssignAction = useCallback(
     (order) => (
-      <AssignRiderButton order={withLive(order)} vertical={assignVertical} onAssigned={refreshAfterAssign} size="xs" />
+      <AssignRiderButton order={withLive(order)} onAssigned={refreshAfterAssign} size="xs" />
     ),
-    [withLive, assignVertical, refreshAfterAssign],
+    [withLive, refreshAfterAssign],
   )
 
   const orderIdFromUrl = searchParams.get("orderId")
@@ -1031,7 +1028,6 @@ export default function OrdersPage({ statusKey = "all" }) {
         isOpen={isViewOrderOpen}
         onOpenChange={setIsViewOrderOpen}
         order={selectedOrder}
-        vertical={assignVertical}
         onOrderChanged={refreshAfterAssign}
       />
       <RefundModal

@@ -77,7 +77,7 @@ await check('a GSTIN can be added from the page, which then allows "restaurant p
     assert.deepEqual([saved.gstNumber, saved.gstRegistered], ['03ABCDE1234F1Z5', true]);
     assert.equal((await gst.setRestaurantGstPayout(String(r), 'restaurant')).gstPayout, 'restaurant');
 });
-await check('removing the GSTIN puts a "restaurant pays" restaurant back on Quickdrops pays', async () => {
+await check('removing the GSTIN puts a "restaurant pays" restaurant back on Azanto pays', async () => {
     const r = await restaurant('restaurant');
     const cleared = await gst.setRestaurantGstin(String(r), '');
     assert.deepEqual([cleared.gstNumber, cleared.gstPayout], ['', 'platform']);

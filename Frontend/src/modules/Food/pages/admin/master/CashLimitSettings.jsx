@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { platformSettingsAPI } from "@food/api"
 import { toast } from "sonner"
-import { Loader2, Wallet, ChevronDown } from "lucide-react"
+import { Loader2, Wallet } from "lucide-react"
 
 /**
  * Platform settings: only the settings that change something on the live site.
@@ -15,10 +15,8 @@ import { Loader2, Wallet, ChevronDown } from "lucide-react"
  * a key to this screen when the code starts obeying it.
  *
  * How the limit applies:
- *   - The shared value covers riders (one limit across Taxi, Food and Quick
- *     Commerce) and service providers.
- *   - Service providers may have their own value (vertical override); riders
- *     may not -- a per-service rider value is ignored by the server.
+ *   - The shared value covers riders (one limit across Taxi and Food); a
+ *     per-service rider value is ignored by the server.
  *   - Empty = not managed here: each partner keeps the limit from its own
  *     older screen. 0 = no limit.
  *   - Per-partner overrides are set on the partner's own page, not here.
@@ -64,27 +62,19 @@ const describe = (value) =>
 export default function CashLimitSettings() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState("")
-  const [saved, setSaved] = useState({ limit: null, enforce: true, spLimit: null })
+  const [saved, setSaved] = useState({ limit: null, enforce: true })
   const [limit, setLimit] = useState(null)
-  const [spLimit, setSpLimit] = useState(null)
-  const [spOpen, setSpOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [base, sp] = await Promise.all([
-        platformSettingsAPI.resolveAll({}),
-        platformSettingsAPI.resolveAll({ vertical: "serviceProvider" }),
-      ])
+      const base = await platformSettingsAPI.resolveAll({})
       const find = (res, key) => (res?.data?.data?.settings || []).find((s) => s.key === key)
       const next = {
         limit: savedValue(find(base, LIMIT_KEY), "global"),
         enforce: savedValue(find(base, ENFORCE_KEY), "global") !== false,
-        spLimit: savedValue(find(sp, LIMIT_KEY), "vertical"),
       }
       setSaved(next)
       setLimit(next.limit)
-      setSpLimit(next.spLimit)
-      if (next.spLimit !== null) setSpOpen(true)
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not load platform settings")
     } finally {
@@ -132,7 +122,7 @@ export default function CashLimitSettings() {
               <h2 className="font-semibold text-neutral-900">Cash limit for partners</h2>
               <p className="mt-0.5 text-sm text-neutral-500">
                 The most cash a rider or partner can hold from cash orders before they must deposit it. One limit covers a
-                rider across Taxi, Food and Quick Commerce combined.
+                rider across Taxi and Food combined.
               </p>
             </div>
           </div>
@@ -186,40 +176,6 @@ export default function CashLimitSettings() {
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div className="border-t border-neutral-100 pt-4">
-              <button
-                type="button"
-                onClick={() => setSpOpen((o) => !o)}
-                aria-expanded={spOpen}
-                className="inline-flex items-center gap-1 text-sm font-medium text-neutral-600 hover:text-neutral-900"
-              >
-                <ChevronDown className={`h-4 w-4 transition-transform ${spOpen ? "rotate-180" : ""}`} />
-                A different limit for service providers
-              </button>
-              {spOpen && (
-                <div className="mt-3 flex flex-col gap-3 rounded-lg bg-neutral-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-neutral-600">
-                    {spLimit === null && saved.spLimit === null
-                      ? "Leave empty to use the limit above."
-                      : "Service providers use this instead of the limit above."}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <LimitInput id="sp-cash-limit" value={spLimit} onChange={setSpLimit} disabled={busy === "sp"} />
-                    <button
-                      type="button"
-                      disabled={spLimit === saved.spLimit || busy === "sp"}
-                      onClick={() =>
-                        save(LIMIT_KEY, "vertical", "serviceProvider", spLimit, "sp", spLimit === null ? "Service providers now use the main limit" : "Saved")
-                      }
-                      className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-500"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </section>

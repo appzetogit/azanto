@@ -11,8 +11,7 @@ export const ADMIN_LEVELS = {
 
 export const ADMIN_MODULES = {
   FOOD: 'food',
-  TAXI: 'taxi',
-  QUICK_COMMERCE: 'quickCommerce'
+  TAXI: 'taxi'
 };
 
 export const FOOD_PERMISSION_RESOURCES = [

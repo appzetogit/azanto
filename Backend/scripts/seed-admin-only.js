@@ -39,7 +39,8 @@ try {
   admin.name = name;
   admin.password = password; // hashed by the model's pre-save hook
   admin.isActive = true;
-  admin.servicesAccess = ['food', 'quickCommerce', 'taxi'];
+  // Food + taxi only: quick commerce and service-provider are switched off.
+  admin.servicesAccess = ['food', 'taxi'];
   // admin_type defaults to 'subadmin' with permissions: [] — without these the account gets
   // 403 "You do not have permission to access ..." on every taxi admin resource.
   admin.admin_type = 'superadmin';

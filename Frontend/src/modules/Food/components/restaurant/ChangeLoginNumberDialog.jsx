@@ -16,8 +16,7 @@ const errorText = (error, fallback) =>
 
 /**
  * Change the login number: enter the new number, we text it a code, and the
- * code moves the account onto it. Serves restaurants, stores and medical
- * stores alike (the dashboard's requests go to /food or /qc as signed in).
+ * code moves the account onto it.
  */
 export default function ChangeLoginNumberDialog({ open, onOpenChange, currentPhone, onChanged }) {
   const [step, setStep] = useState("enter")

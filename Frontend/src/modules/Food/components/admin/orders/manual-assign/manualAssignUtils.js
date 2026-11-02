@@ -1,21 +1,9 @@
 /**
  * Shared helpers for the admin "assign a rider by hand" UI.
- *
- * The same admin screens serve Food (/admin/food), Quick (/admin/quick-commerce)
- * and Medical (/admin/medical); Quick and Medical talk to the /qc admin API, so
- * the vertical the server knows them by is 'quickCommerce'.
  */
 
 /** Order states a rider can be handed (mirrors the server's ASSIGNABLE_STATUSES). */
 export const ASSIGNABLE_STATUSES = ["confirmed", "preparing", "ready_for_pickup"]
-
-const QC_ADMIN_PATHS = ["/admin/quick-commerce", "/admin/medical"]
-
-/** 'food' or 'quickCommerce', from the admin path the operator is on. */
-export const adminVerticalFromPath = (pathname) => {
-  const path = pathname ?? (typeof window === "undefined" ? "" : window.location.pathname || "")
-  return QC_ADMIN_PATHS.some((base) => path.startsWith(base)) ? "quickCommerce" : "food"
-}
 
 const isWireStatus = (value) => typeof value === "string" && /^[a-z_]+$/.test(value)
 

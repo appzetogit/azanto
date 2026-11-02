@@ -13,8 +13,6 @@ import {
   UtensilsCrossed,
   Car,
   Truck,
-  Wrench,
-  ShoppingBag,
   RefreshCw,
   ExternalLink,
   Sparkles
@@ -25,10 +23,10 @@ import { toast } from "sonner"
 import { loadRuntimeEnv } from "@/config/runtimeEnv"
 
 /**
- * Google Maps API Key Management for the entire SuperApp / Quick Drop platform.
+ * Google Maps API Key Management for the entire SuperApp / Azanto platform.
  *
  * Stored in the shared database settings document and served to every module
- * (Food, Taxi, Delivery Logistics, Service Provider, Quick Commerce, and Admin dashboards)
+ * (Food, Taxi, Delivery Logistics and Admin dashboards)
  * through /api/v1/env/public at runtime.
  */
 export default function MapSettings() {
@@ -170,18 +168,6 @@ export default function MapSettings() {
       desc: "Courier route polylines & real-time shipment map tracking",
       icon: Truck,
       color: "bg-emerald-50 text-emerald-600 border-emerald-100"
-    },
-    {
-      name: "Service Provider",
-      desc: "Technician travel routes & customer service location selection",
-      icon: Wrench,
-      color: "bg-purple-50 text-purple-600 border-purple-100"
-    },
-    {
-      name: "Quick Commerce",
-      desc: "Dark store radius coverage & 10-minute instant dropoff maps",
-      icon: ShoppingBag,
-      color: "bg-sky-50 text-sky-600 border-sky-100"
     }
   ]
 

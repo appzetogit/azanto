@@ -12,7 +12,9 @@ import { ADMIN_LEVELS } from './adminHierarchy.constants.js';
 import { getDescendantAdminIds } from './adminHierarchy.service.js';
 import {
   ADMIN_PERMISSION_CATALOG,
-  ADMIN_SERVICES,
+  ACTIVE_ADMIN_SERVICES,
+  ACTIVE_ADMIN_SERVICE_KEYS,
+  activeServicesOf,
   canAdminDelete,
   effectiveAdminLevel,
   effectiveServices,
@@ -34,7 +36,9 @@ export function describeCaller(admin) {
   const owner = level === ADMIN_LEVELS.PLATFORM_SUPERADMIN;
   const superLike = level !== ADMIN_LEVELS.SUBADMIN;
   const permissions = superLike ? ['*'] : expandPermissions(admin.permissions);
-  const services = owner ? ADMIN_SERVICES.map((s) => s.key) : effectiveServices(admin);
+  // Only the panels that are switched on (food + taxi), so a caller can neither see
+  // nor hand out quick commerce / medical. Enforcement still reads effectiveServices.
+  const services = owner ? [...ACTIVE_ADMIN_SERVICE_KEYS] : activeServicesOf(effectiveServices(admin));
   const wildcard = permissions.includes('*');
   return {
     id: String(admin._id),
@@ -97,7 +101,7 @@ function serialize(doc, names = {}) {
     email: doc.email || '',
     phone: doc.phone || '',
     role,
-    servicesAccess: role === ROLE.OWNER ? ADMIN_SERVICES.map((s) => s.key) : effectiveServices(doc),
+    servicesAccess: role === ROLE.OWNER ? [...ACTIVE_ADMIN_SERVICE_KEYS] : activeServicesOf(effectiveServices(doc)),
     permissions: role === ROLE.CUSTOM ? sanitizePermissions(doc.permissions) : ['*'],
     serviceLocationIds: (doc.service_location_ids || []).map(String),
     foodZoneIds: (doc.food_zone_ids || []).map(String),
@@ -115,7 +119,7 @@ function serialize(doc, names = {}) {
 
 export async function getMeta(admin) {
   const caller = describeCaller(admin);
-  const services = ADMIN_SERVICES.filter((s) => caller.servicesAccess.includes(s.key));
+  const services = ACTIVE_ADMIN_SERVICES.filter((s) => caller.servicesAccess.includes(s.key));
   const grantable = (key) => caller.permissions.includes('*') || caller.permissions.includes(`${key}.read`);
   const catalog = ADMIN_PERMISSION_CATALOG.map((g) => ({
     group: g.group,
@@ -340,7 +344,9 @@ function applyTo(doc, data, admin) {
     doc.admin_type = 'superadmin';
     doc.module = null;
     doc.permissions = ['*'];
-    doc.servicesAccess = ['food', 'quickCommerce', 'medical', 'taxi', 'serviceProvider'];
+    // Food + taxi only: quick commerce, medical and service-provider are switched off.
+    // An owner passes every check by level, so this list is what the panel shows.
+    doc.servicesAccess = [...ACTIVE_ADMIN_SERVICE_KEYS];
     doc.canDelete = true;
   } else {
     if (data.canDelete !== undefined) doc.canDelete = data.canDelete;

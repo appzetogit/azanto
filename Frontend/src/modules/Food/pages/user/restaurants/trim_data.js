@@ -3,7 +3,7 @@ const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
 const fs = require('fs');
-const path = 'e:\\Quick Drop\\Quick Drop\\frontend\\src\\module\\user\\pages\\restaurants\\RestaurantDetails.jsx';
+const path = 'e:\\Azanto\\Azanto\\frontend\\src\\module\\user\\pages\\restaurants\\RestaurantDetails.jsx';
 const content = fs.readFileSync(path, 'utf8');
 const lines = content.split(/\r?\n/);
 debugLog('Total lines:', lines.length);

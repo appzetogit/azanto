@@ -5,7 +5,7 @@ import { ArrowLeft, Tag, CheckCircle2, X, ChevronRight, Ticket } from 'lucide-re
 import BottomNavbar from '../components/BottomNavbar';
 
 const MOCK_PROMOS = [
-  { id: '1', code: 'Quick Drop50',  discount: 50,  type: 'flat',    service: 'All Rides',    expiry: '30 Apr 2026', minFare: 100 },
+  { id: '1', code: 'Azanto50',  discount: 50,  type: 'flat',    service: 'All Rides',    expiry: '30 Apr 2026', minFare: 100 },
   { id: '2', code: 'GOFREE',   discount: 100, type: 'flat',    service: 'Cab Only',     expiry: '15 Apr 2026', minFare: 150 },
   { id: '3', code: 'SAVE20',   discount: 20,  type: 'percent', service: 'Parcel',       expiry: '30 Apr 2026', minFare: 50  },
   { id: '4', code: 'NEWUSER',  discount: 75,  type: 'flat',    service: 'First Ride',   expiry: '30 Apr 2026', minFare: 80  },
@@ -112,7 +112,7 @@ const PromoCodes = () => {
               value={manualCode}
               onChange={e => setManualCode(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && handleManualApply()}
-              placeholder="e.g. Quick Drop50"
+              placeholder="e.g. Azanto50"
               className="flex-1 bg-slate-50 border border-slate-100 rounded-[12px] px-4 py-2.5 text-[14px] font-black text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-orange/20"
             />
             <motion.button whileTap={{ scale: 0.96 }} onClick={handleManualApply}

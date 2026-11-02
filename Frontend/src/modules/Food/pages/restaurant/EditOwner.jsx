@@ -453,7 +453,7 @@ export default function EditOwner() {
                 <span className="text-2xl leading-none text-red-600">!</span>
               </div>
               <DialogTitle className="text-base font-bold text-gray-900 text-center">
-                You are about to delete your Quick Drop Store account
+                You are about to delete your Azanto Store account
               </DialogTitle>
               <DialogDescription className="mt-2 text-xs text-gray-600 leading-relaxed text-center">
                 All information associated with your account will be deleted, and you will lose access to your restaurant permanently.

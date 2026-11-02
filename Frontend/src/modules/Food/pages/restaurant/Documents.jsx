@@ -5,17 +5,15 @@ import useRestaurantBackNavigation from "@food/hooks/useRestaurantBackNavigation
 import { restaurantAPI } from "@food/api"
 
 /*
- * Compliance documents: PAN, GST, FSSAI and, for a medical store, the drug
- * licence. An edit goes to the admin as a change request and the outlet keeps
- * taking orders meanwhile; what is shown as "On file" stays in force until the
- * admin approves. Serves restaurants, stores and medical stores alike.
+ * Compliance documents: PAN, GST and FSSAI. An edit goes to the admin as a
+ * change request and the restaurant keeps taking orders meanwhile; what is
+ * shown as "On file" stays in force until the admin approves.
  */
 
 const GROUPS = [
   { title: "PAN", fields: ["panNumber", "nameOnPan", "panImage"] },
   { title: "GST", fields: ["gstRegistered", "gstNumber", "gstLegalName", "gstAddress", "gstImage"] },
   { title: "FSSAI food licence", fields: ["fssaiNumber", "fssaiExpiry", "fssaiImage"] },
-  { title: "Drug licence", fields: ["drugLicenseNumber", "drugLicenseExpiry", "drugLicenseImage"] },
 ]
 
 const HINTS = {

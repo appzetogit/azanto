@@ -11,7 +11,7 @@
  * picks them up on its next settings refresh (30s).
  *
  * One repair on the way: a delivery-partner agreement saved as the CUSTOMER terms
- * (food "terms" page -- Quick Drop's Gig Worker Onboarding Agreement was) is
+ * (food "terms" page -- Azanto's Gig Worker Onboarding Agreement was) is
  * copied to the delivery partner app's own terms page, where riders read it. The
  * original is left in place, only outranked by the customer terms.
  */
@@ -33,7 +33,7 @@ const settings = (await db.collection('foodbusinesssettings').findOne({})) || (a
 const foodTerms = await db.collection('food_page_contents').findOne({ key: 'terms' });
 const foodTermsHtml = String(foodTerms?.legal?.content || '');
 
-const brand = String(profile.brand?.name || settings.companyName || 'Quick Drop').trim();
+const brand = String(profile.brand?.name || settings.companyName || 'Azanto').trim();
 // The registered name, if the operator has given it anywhere: Master settings, or
 // the heading of a document they wrote themselves.
 const titleCase = (t) => t.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -42,7 +42,7 @@ const namesInDoc = [...foodTermsHtml.replace(/<[^>]+>/g, ' ')
   .map((m) => m[1].replace(/\s+/g, ' ').trim());
 const operator = String(
   profile.business?.legalName
-  || namesInDoc.find((n) => n !== n.toUpperCase()) // as the operator wrote it, e.g. "QuickDrop Private Limited"
+  || namesInDoc.find((n) => n !== n.toUpperCase()) // as the operator wrote it, e.g. "Azanto Private Limited"
   || (namesInDoc[0] ? titleCase(namesInDoc[0]) : ''),
 ).trim();
 console.log(`Brand: ${brand}\nOperator: ${operator || '(not known -- brand name used)'}`);

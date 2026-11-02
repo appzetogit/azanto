@@ -134,7 +134,7 @@ export function createPaymentLink({ amountPaise, currency = 'INR', description, 
                     logger.warn(`[Razorpay] Falling back to standard UPI URI due to Authentication failed`);
                     return {
                         id: `mock_plink_${Date.now()}`,
-                        short_url: `upi://pay?pa=k9rides@ybl&pn=QuickDrop&am=${(amountPaise / 100).toFixed(2)}&tr=${orderId}`,
+                        short_url: `upi://pay?pa=k9rides@ybl&pn=Azanto&am=${(amountPaise / 100).toFixed(2)}&tr=${orderId}`,
                         status: 'created',
                         expire_by: Math.floor(Date.now() / 1000) + 86400
                     };

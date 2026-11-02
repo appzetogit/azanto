@@ -444,9 +444,9 @@ export const useRestaurantNotifications = () => {
       
       // Common patterns:
       // - If frontend is on foods.K9 Rides.com, backend might be api.foods.K9 Rides.com or foods.K9 Rides.com
-      if (frontendHost.includes('foods.Quick Drop.com')) {
-        suggestedBackendUrl = `${frontendProtocol}//api.foods.Quick Drop.com/api`;
-      } else if (frontendHost.includes('Quick Drop.com')) {
+      if (frontendHost.includes('foods.Azanto.com')) {
+        suggestedBackendUrl = `${frontendProtocol}//api.foods.Azanto.com/api`;
+      } else if (frontendHost.includes('Azanto.com')) {
         suggestedBackendUrl = `${frontendProtocol}//api.${frontendHost}/api`;
       }
       

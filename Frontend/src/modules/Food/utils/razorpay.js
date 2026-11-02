@@ -94,9 +94,9 @@ export const initRazorpayPayment = async (options) => {
       amount: options.amount,
       currency: options.currency || 'INR',
       order_id: options.order_id,
-      name: options.name || 'Quick Drop',
+      name: options.name || 'Azanto',
       description: options.description || 'Order Payment',
-      image: options.image || '/k9-logo.jpg',
+      image: options.image || '/brand/azanto-icon-192.png',
       prefill: {
         name: options.prefill?.name || '',
         email: options.prefill?.email || '',

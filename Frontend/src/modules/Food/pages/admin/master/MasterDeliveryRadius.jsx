@@ -28,15 +28,12 @@ const apiError = (err, fallback) => err?.response?.data?.message || fallback
 
 const SERVICES = [
   { key: "food", label: "Food" },
-  { key: "quick", label: "Quick" },
-  { key: "medical", label: "Medical" },
 ]
 
 /*
- * One radius per zone per service: how far a store in that zone delivers.
- * Quick and Medical stores take their zone's radius (blank = no limit). For
- * Food, saving a zone writes the radius to every restaurant in it, which can
- * then be adjusted per restaurant in the table below.
+ * One radius per zone per service: how far a restaurant in that zone delivers.
+ * For Food, saving a zone writes the radius to every restaurant in it, which
+ * can then be adjusted per restaurant in the table below.
  */
 function ZoneRadiusSection({ onFoodChanged }) {
   const [service, setService] = useState("food")

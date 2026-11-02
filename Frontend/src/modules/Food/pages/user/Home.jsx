@@ -89,7 +89,7 @@ import {
 } from "@food/components/ui/dropdown-menu";
 import { useLocation } from "@food/hooks/useLocation";
 import { useZone } from "@food/hooks/useZone";
-import quickSpicyLogo from "@food/assets/k9-logo.jpg";
+import quickSpicyLogo from "@food/assets/azanto-logo.png";
 import offerImage from "@food/assets/offerimage.png";
 import api, { publicGetOnce, restaurantAPI, adminAPI, orderAPI } from "@food/api";
 import { API_BASE_URL } from "@food/api/config";
@@ -112,7 +112,6 @@ const isVideoBannerUrl = (url) => {
 
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability";
 import HomeHeader from "@food/components/user/home/HomeHeader";
-import QuickSection from "@food/components/user/home/QuickSection";
 import PromoRow from "@food/components/user/home/PromoRow";
 import PromotionBannerCarousel from "@food/components/user/home/PromotionBannerCarousel";
 import StaticPromoBanners from "@food/components/user/home/StaticPromoBanners";

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Briefcase, Home, MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
 
-const STORAGE_KEY = 'Quick Drop:savedAddresses';
+const STORAGE_KEY = 'Azanto:savedAddresses';
 
 const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 

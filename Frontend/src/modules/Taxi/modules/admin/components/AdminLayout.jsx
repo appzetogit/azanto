@@ -46,18 +46,14 @@ import {
   Users,
   UtensilsCrossed,
   Wallet,
-  Wrench,
-  ShoppingBasket,
-  Pill,
   Zap,
   SlidersHorizontal,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import quickSpicyLogo from "@food/assets/k9-logo.jpg";
+import quickSpicyLogo from "@food/assets/azanto-logo.png";
 import { getCachedSettings, loadBusinessSettings, normalizeCompanyName } from "@food/utils/businessSettings";
 import { refreshAdminAccess, useAdminAccess, hasPanel, isRestricted, canOpenPath } from "@food/utils/adminAccess";
-import { SERVICE_PROVIDER_ENABLED } from "@/config/features";
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -647,10 +643,10 @@ const AdminLayout = () => {
   const notificationsMenuRef = useRef(null);
   const [adminProfile, setAdminProfile] = useState(() => readAdminProfile());
 
-  const appName = settings.general?.app_name || 'Quick Drop';
+  const appName = settings.general?.app_name || 'Azanto';
   const [businessCompanyName, setBusinessCompanyName] = useState(() => {
     const cached = getCachedSettings();
-    return normalizeCompanyName(cached?.companyName) || settings.general?.app_name || 'Quick Drop';
+    return normalizeCompanyName(cached?.companyName) || settings.general?.app_name || 'Azanto';
   });
 
   useEffect(() => {
@@ -1524,7 +1520,7 @@ const AdminLayout = () => {
                   )}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--sb-ink-faint)]" />
-                  Master
+                  Master Settings
                 </button>}
                 {showPanel("food") && <button
                   type="button"
@@ -1552,43 +1548,6 @@ const AdminLayout = () => {
                   <Truck className="w-3.5 h-3.5 text-[var(--sb-active-ink)]" />
                   Taxi
                 </button>
-                {/* Services: per site (config/features.js), the same flag that
-                    gates the /admin/sp route. */}
-                {SERVICE_PROVIDER_ENABLED && showPanel("serviceProvider") && <button
-                  type="button"
-                  onClick={() => navigate("/admin/sp/dashboard")}
-                  className={cn(
-                    "flex-1 min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] leading-none font-bold rounded-lg transition-all duration-300",
-                    "text-[var(--sb-ink-faint)] hover:text-[var(--sb-ink-soft)] hover:bg-[var(--sb-hover)]"
-                  )}
-                >
-                  <Wrench className="w-3.5 h-3.5 text-[var(--sb-ink-faint)]" />
-                  Services
-                </button>}
-                {showPanel("quickCommerce") && <button
-                  type="button"
-                  onClick={() => navigate("/admin/quick-commerce")}
-                  className={cn(
-                    "flex-1 min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] leading-none font-bold rounded-lg transition-all duration-300",
-                    "text-[var(--sb-ink-faint)] hover:text-[var(--sb-ink-soft)] hover:bg-[var(--sb-hover)]"
-                  )}
-                >
-                  <ShoppingBasket className="w-3.5 h-3.5 text-[var(--sb-ink-faint)]" />
-                  Quick
-                </button>}
-                {/* Medical sits beside Quick in every panel's switcher; it was only
-                    added to the food one, so it vanished on the way here. */}
-                {showPanel("medical") && <button
-                  type="button"
-                  onClick={() => navigate("/admin/medical")}
-                  className={cn(
-                    "flex-1 min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] leading-none font-bold rounded-lg transition-all duration-300",
-                    "text-[var(--sb-ink-faint)] hover:text-[var(--sb-ink-soft)] hover:bg-[var(--sb-hover)]"
-                  )}
-                >
-                  <Pill className="w-3.5 h-3.5 text-[var(--sb-ink-faint)]" />
-                  Medical
-                </button>}
               </div>
             )}
           </div>

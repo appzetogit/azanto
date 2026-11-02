@@ -19,7 +19,7 @@ const CLASS_LABELS = {
 }
 
 const INTENT_LABELS = {
-  food_daily_medical_parcel: 'Food + Daily needs + Medical + Bike parcel',
+  food_daily_medical_parcel: 'Food + Bike parcel',
   bike_taxi_parcel: 'Bike Taxi',
   three_wheeler: '3 wheeler',
   four_wheeler: '4 wheeler',
@@ -31,10 +31,10 @@ const INTENT_LABELS = {
  * Which capabilities each answer asks for. Fallback only: the server sends
  * `requestedCapabilities` worked out by the rule dispatch uses
  * (driverClasses.js). Kept in step with it: bike parcel goes with the
- * Food + Daily needs + Medical rider, Bike Taxi is passengers only.
+ * Food rider, Bike Taxi is passengers only.
  */
 const INTENT_CAPABILITIES = {
-  food_daily_medical_parcel: ['delivery', 'quickCommerce', 'parcel'],
+  food_daily_medical_parcel: ['delivery', 'parcel'],
   bike_taxi_parcel: ['taxi'],
   three_wheeler: ['taxi'],
   four_wheeler: ['taxi'],
@@ -53,7 +53,7 @@ const capabilitiesRequestedBy = (intents) => {
 }
 
 // The admin grants capabilities in two boxes, not one per capability: the
-// whole delivery side (food, quick commerce, medical and bike parcel) is one
+// whole delivery side (food and bike parcel) is one
 // decision, and bike taxi (passengers) is the other. Each box toggles its full
 // capability set on the flat serviceCapabilities list the backend expects, so
 // ticking both leaves a driver with every capability (work mode "all" -> both
@@ -61,8 +61,8 @@ const capabilitiesRequestedBy = (intents) => {
 const CAPABILITY_GROUPS = [
   {
     key: 'delivery_group',
-    label: 'Food + Quick Commerce + Medical + Bike Porter',
-    caps: ['delivery', 'quickCommerce', 'parcel'],
+    label: 'Food + Bike Porter',
+    caps: ['delivery', 'parcel'],
   },
   {
     key: 'taxi_group',

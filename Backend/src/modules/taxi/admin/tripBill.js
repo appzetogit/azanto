@@ -2,7 +2,7 @@
  * The complete bill of one taxi ride or parcel, for Taxi admin > Trip Requests.
  *
  * What the customer was charged, line by line, and how it divides between the
- * driver and Quickdrops. Built from the ride itself:
+ * driver and Azanto. Built from the ride itself:
  *
  *   trip fare (the driver's)  = fare before surge - platform charges
  *   platform charges          = service tax + platform fee + GST on the fee
@@ -61,7 +61,7 @@ export function buildTripBill(ride) {
     // What the driver gets for the trip itself: earnings less the tip (paid by
     // the customer on top) and any platform incentive.
     const driverTripShare = money(driverEarnings - tip - incentive);
-    const quickdropsKeeps = money(fare - driverTripShare);
+    const platformKeeps = money(fare - driverTripShare);
 
     return {
         chargesRecorded,
@@ -87,8 +87,10 @@ export function buildTripBill(ride) {
             incentive,
             driverTotal: driverEarnings,
             commission: money(ride?.commissionAmount),
-            quickdropsKeeps,
-            // Owed on to the government out of what Quickdrops keeps.
+            platformKeeps,
+            // Old name for platformKeeps, kept so app builds that read it don't break.
+            quickdropsKeeps: platformKeeps,
+            // Owed on to the government out of what the platform keeps.
             taxesToGovernment: chargesRecorded ? money(serviceTax + platformFeeGst) : null,
         },
     };

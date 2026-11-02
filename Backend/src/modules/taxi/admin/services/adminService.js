@@ -3246,7 +3246,7 @@ export const forgotPassword = async (email) => {
   // Send real email
   await sendEmail({
     to: email,
-    subject: `Password Reset OTP for ${process.env.APP_NAME || 'Quick Drop'}`,
+    subject: `Password Reset OTP for ${process.env.APP_NAME || 'Azanto'}`,
     text: `Your OTP for password reset is: ${otp}. It will expire in 10 minutes.`,
     html: `
       <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 500px;">
@@ -3258,7 +3258,7 @@ export const forgotPassword = async (email) => {
         </div>
         <p>This OTP is valid for 10 minutes. If you did not request this, please ignore this email.</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-        <p style="font-size: 12px; color: #666;">Regards,<br>Team ${process.env.APP_NAME || 'Quick Drop'}</p>
+        <p style="font-size: 12px; color: #666;">Regards,<br>Team ${process.env.APP_NAME || 'Azanto'}</p>
       </div>
     `,
   });
@@ -5616,7 +5616,7 @@ const toAdminRideRow = (ride) => {
     // The ride's own payment method; it was 'CASH' for every ride.
     paymentOption: paymentLabel(ride).toUpperCase(),
     paymentMethod: ride.paymentMethod || 'cash',
-    // Complete bill and driver / Quickdrops split (admin/tripBill.js).
+    // Complete bill and driver / Azanto split (admin/tripBill.js).
     bill: buildTripBill(ride),
     fare: Number(ride.fare || 0),
     baseFare: Number(ride.baseFare || ride.fare || 0),

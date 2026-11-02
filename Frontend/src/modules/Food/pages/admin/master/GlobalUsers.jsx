@@ -8,8 +8,7 @@ import { SCROLL_TABLE_CLASS, STICKY_THEAD_CLASS } from "@food/components/admin/T
  * Master > Customers: every customer on the platform, in one list.
  *
  * Food and taxi customers are already the same documents in one `users`
- * collection; quick commerce and services keep their own, matched in by link or
- * by phone. So this screen replaces four per-vertical customer lists that could
+ * collection. So this screen replaces the per-vertical customer lists that could
  * each only see their own slice of the same person.
  *
  * One write: Block / Unblock, which the server applies to every app with plain
@@ -31,8 +30,6 @@ const STATUSES = [
 const APP_STYLES = {
   food: "bg-orange-50 text-orange-700 border-orange-200",
   taxi: "bg-blue-50 text-blue-700 border-blue-200",
-  quick: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  services: "bg-purple-50 text-purple-700 border-purple-200",
 }
 
 const inputCls =
@@ -108,7 +105,7 @@ export default function GlobalUsers() {
 
   const toggleBlocked = async (u) => {
     const block = u.isActive
-    if (block && !window.confirm(`Block ${u.name || u.phone}? They will be signed out of every Quick Drop app.`)) return
+    if (block && !window.confirm(`Block ${u.name || u.phone}? They will be signed out of every Azanto app.`)) return
     setBlockingId(u.id)
     try {
       await platformSettingsAPI.setGlobalUserBlocked(u.id, block)
@@ -159,7 +156,7 @@ export default function GlobalUsers() {
           <div>
             <h1 className="text-2xl font-semibold text-neutral-900">Customers</h1>
             <p className="mt-1 text-sm text-neutral-600">
-              Everyone who uses Food, Quick Commerce, Medical, Taxi or Services — one person, one row.
+              Everyone who uses Food or Taxi — one person, one row.
             </p>
           </div>
           <button type="button" className={btnCls} onClick={exportCsv} disabled={exporting || loading}>
@@ -261,11 +258,6 @@ export default function GlobalUsers() {
                       <td className="px-3 py-3"><AppTags apps={u.apps} /></td>
                       <td className="px-3 py-3 text-right tabular-nums">
                         {u.orders}
-                        {u.orders > 0 && (
-                          <p className="text-[11px] text-neutral-400">
-                            {u.foodOrders} food · {u.quickOrders} quick
-                          </p>
-                        )}
                       </td>
                       <td className="px-3 py-3 text-right tabular-nums">{rupees(u.orderValue)}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{u.rides}</td>
@@ -340,8 +332,7 @@ export default function GlobalUsers() {
         </section>
 
         <p className="px-1 text-xs text-neutral-500">
-          Orders counts Food, and Quick Commerce with Medical, from their own order records; the
-          small figures under each total show the split. Blocking here blocks the customer in every app.
+          Orders counts Food orders. Blocking here blocks the customer in every app.
         </p>
       </div>
     </div>

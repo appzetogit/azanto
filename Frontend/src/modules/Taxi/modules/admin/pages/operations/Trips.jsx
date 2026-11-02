@@ -403,11 +403,11 @@ function TripBill({ bill, fallbackFare }) {
           </p>
           <BillLine label="Driver: trip" value={split.driverTripShare} />
           {show(split.tip) && <BillLine label="Driver: tip" value={split.tip} sign="+ " />}
-          {show(split.incentive) && <BillLine label="Driver: incentive (paid by Quickdrops)" value={split.incentive} sign="+ " />}
+          {show(split.incentive) && <BillLine label="Driver: incentive (paid by Azanto)" value={split.incentive} sign="+ " />}
           <BillLine label="Driver total" value={split.driverTotal} strong tone="text-slate-900" />
           {show(split.commission) && <BillLine label="Commission from driver" value={split.commission} tone="text-slate-500" />}
           <div className="pt-2 mt-2 border-t border-slate-100 space-y-2">
-            <BillLine label="Quickdrops keeps" value={split.quickdropsKeeps} strong tone="text-slate-900" />
+            <BillLine label="Azanto keeps" value={split.platformKeeps} strong tone="text-slate-900" />
             {show(split.taxesToGovernment) && (
               <BillLine label="of which tax and GST owed to the government" value={split.taxesToGovernment} tone="text-slate-500" />
             )}

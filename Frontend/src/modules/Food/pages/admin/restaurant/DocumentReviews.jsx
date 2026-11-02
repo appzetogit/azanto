@@ -3,11 +3,9 @@ import { CheckCircle2, FileText, Loader2, RefreshCw, XCircle } from "lucide-reac
 import { toast } from "sonner"
 import { Card } from "@food/components/ui/card"
 import { adminAPI } from "@food/api"
-import { adminPanelOf } from "@food/utils/adminPanel"
 
 /*
- * Document change requests from outlets: restaurants (Food) and stores and
- * medical stores (quick commerce). The outlet keeps trading while a request
+ * Document change requests from restaurants. The outlet keeps trading while a request
  * waits; approving puts the new values on file, rejecting keeps the old ones
  * and tells the outlet why. See core/sellerDocuments.js on the server.
  */
@@ -57,15 +55,9 @@ export default function DocumentReviews() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    // Each panel reviews its own outlets: restaurants in Food, stores in Quick
-    // Commerce, pharmacies in Medical (the same store API, narrowed here).
-    const panel = adminPanelOf()
     try {
-      const res = await adminAPI.getDocumentReviews(panel.vertical, status)
-      const next = (res?.data?.data?.reviews || [])
-        .filter((row) => !panel.pharmacyOnly || row.storeType === "pharmacy")
-        .map((row) => ({ ...row, vertical: panel.vertical }))
-      setRows(next)
+      const res = await adminAPI.getDocumentReviews(status)
+      setRows(res?.data?.data?.reviews || [])
     } catch {
       toast.error("Could not load document reviews")
       setRows([])
@@ -77,14 +69,11 @@ export default function DocumentReviews() {
     load()
   }, [load])
 
-  const typeOf = (row) =>
-    row.vertical === "food" ? "Restaurant" : row.storeType === "pharmacy" ? "Medical store" : "Store"
-
   const approve = async (row) => {
     if (!window.confirm(`Put ${row.name}'s new documents on file?`)) return
     setBusyId(row.id)
     try {
-      await adminAPI.approveDocumentReview(row.vertical, row.id)
+      await adminAPI.approveDocumentReview(row.id)
       toast.success(`Approved ${row.name}'s documents`)
       await load()
     } catch (err) {
@@ -103,7 +92,7 @@ export default function DocumentReviews() {
     const row = rejecting
     setBusyId(row.id)
     try {
-      await adminAPI.rejectDocumentReview(row.vertical, row.id, reason.trim())
+      await adminAPI.rejectDocumentReview(row.id, reason.trim())
       toast.success(`Rejected ${row.name}'s change`)
       setRejecting(null)
       setReason("")
@@ -124,7 +113,7 @@ export default function DocumentReviews() {
         <div>
           <h1 className="text-lg font-semibold text-gray-900 sm:text-xl">Document reviews</h1>
           <p className="text-sm text-gray-500">
-            PAN, GST, FSSAI and drug licence changes sent by {adminPanelOf().vertical === "food" ? "restaurants" : adminPanelOf().pharmacyOnly ? "medical stores" : "stores"}. They keep taking orders while they wait.
+            PAN, GST and FSSAI changes sent by restaurants. They keep taking orders while they wait.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -158,12 +147,12 @@ export default function DocumentReviews() {
             const previous = row.review?.previous || {}
             const fields = Object.keys(changes)
             return (
-              <Card key={`${row.vertical}-${row.id}`} className="border border-gray-200 shadow-sm">
+              <Card key={row.id} className="border border-gray-200 shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-semibold text-gray-900">{row.name || "Unnamed outlet"}</h2>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{typeOf(row)}</span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">Restaurant</span>
                       {row.outletStatus && (
                         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Outlet {row.outletStatus}</span>
                       )}

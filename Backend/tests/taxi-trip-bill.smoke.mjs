@@ -35,18 +35,18 @@ await check('the bill lists trip fare, fee, GST on it, tax and rounding, adding 
     assert.deepEqual([l.tripFare, l.platformFee, l.platformFeeGst, l.serviceTax, l.rounding, b.customerPays], [30, 4.5, 0.81, 1.5, 0.19, 37]);
     assert.equal(Math.round((l.tripFare + l.platformFee + l.platformFeeGst + l.serviceTax + l.rounding) * 100) / 100, 37);
 });
-await check('the split: driver 30, Quickdrops 7, of which 2.31 tax and GST', async () => {
+await check('the split: driver 30, Azanto 7, of which 2.31 tax and GST', async () => {
     const s = buildTripBill(ride).split;
-    assert.deepEqual([s.driverTripShare, s.driverTotal, s.quickdropsKeeps, s.taxesToGovernment, s.commission], [30, 30, 7, 2.31, 0]);
+    assert.deepEqual([s.driverTripShare, s.driverTotal, s.platformKeeps, s.taxesToGovernment, s.commission], [30, 30, 7, 2.31, 0]);
 });
-await check('a tip shows on the driver side, not as Quickdrops money', async () => {
+await check('a tip shows on the driver side, not as Azanto money', async () => {
     const s = buildTripBill({ ...ride, driverEarnings: 40, feedback: { tipAmount: 10 } }).split;
-    assert.deepEqual([s.driverTripShare, s.tip, s.driverTotal, s.quickdropsKeeps], [30, 10, 40, 7]);
+    assert.deepEqual([s.driverTripShare, s.tip, s.driverTotal, s.platformKeeps], [30, 10, 40, 7]);
 });
 await check('a ride booked before the split was recorded says so instead of guessing', async () => {
     const b = buildTripBill({ fare: 51, status: 'completed', paymentMethod: 'cash', driverEarnings: 51, pricingSnapshot: {} });
     assert.equal(b.chargesRecorded, false);
-    assert.deepEqual([b.lines.tripFare, b.lines.platformFee, b.customerPays, b.split.driverTotal, b.split.quickdropsKeeps], [null, null, 51, 51, 0]);
+    assert.deepEqual([b.lines.tripFare, b.lines.platformFee, b.customerPays, b.split.driverTotal, b.split.platformKeeps], [null, null, 51, 51, 0]);
 });
 await check('payment shows the ride\'s own method, not always cash', async () => {
     assert.deepEqual(

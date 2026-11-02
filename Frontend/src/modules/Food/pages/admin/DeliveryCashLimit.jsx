@@ -269,7 +269,7 @@ export default function DeliveryCashLimit() {
                 </div>
                 <div className="text-sm text-indigo-800/80 mb-3">
                   Refundable amount each delivery partner must pay into their wallet before they can go online and
-                  receive orders (food, quick commerce &amp; daily needs). This amount stays <strong>locked</strong> and
+                  receive orders. This amount stays <strong>locked</strong> and
                   can never be withdrawn — only earnings above it are withdrawable. Set <strong>0</strong> to turn the
                   requirement off.
                 </div>

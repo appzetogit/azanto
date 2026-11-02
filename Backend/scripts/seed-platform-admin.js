@@ -8,7 +8,8 @@
  *   node scripts/seed-platform-admin.js --email=you@example.com --password='...' --apply
  *
  * Grants what the panels actually check:
- *   servicesAccess : food, quickCommerce, taxi, serviceProvider
+ *   servicesAccess : food, taxi   (quick commerce and service-provider are switched
+ *                    off -- the product is food + taxi only)
  *   adminLevel     : platform_superadmin   (core/admin/adminHierarchy.service.js)
  *   admin_type     : superadmin
  *   role           : super_admin           (service-provider routes gate on this --
@@ -51,7 +52,7 @@ if (!URI) {
 await mongoose.connect(URI);
 const { FoodAdmin } = await import('../src/core/admin/admin.model.js');
 
-const SERVICES = ['food', 'quickCommerce', 'taxi', 'serviceProvider'];
+const SERVICES = ['food', 'taxi'];
 const existing = await FoodAdmin.findOne({ email });
 
 console.log(`\ndatabase: ${mongoose.connection.db.databaseName}`);

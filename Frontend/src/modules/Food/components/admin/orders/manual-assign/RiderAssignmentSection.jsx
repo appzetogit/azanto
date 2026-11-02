@@ -5,7 +5,6 @@ import AssignRiderButton from "./AssignRiderButton"
 import ManualAssignStatus from "./ManualAssignStatus"
 import { useAdminDispatchSocket } from "./useAdminDispatchSocket"
 import {
-  adminVerticalFromPath,
   canAssignRider,
   describeManualAssignment,
   eventMatchesOrder,
@@ -20,15 +19,14 @@ const FALLBACK_REFRESH_MS = 10000
  * Rider assignment block for an order details view.
  *
  * Reads the order afresh when shown (list rows can be a few seconds old, and
- * some lists -- the prescription queue -- carry no dispatch data at all), then
+ * some lists carry no dispatch data at all), then
  * stays current from the admin socket. Without a socket it re-reads every 10s,
  * and only while a manual assignment is waiting on the rider.
  *
  * `order` must carry the raw orderStatus somewhere (status / rawOrderStatus)
  * for the button to decide whether to show before the fresh read lands.
  */
-export default function RiderAssignmentSection({ order, vertical: verticalProp, onChanged, title = "Rider assignment" }) {
-  const vertical = verticalProp || adminVerticalFromPath()
+export default function RiderAssignmentSection({ order, onChanged, title = "Rider assignment" }) {
   const id = orderKey(order)
   const [fresh, setFresh] = useState(null)
   const [liveEvent, setLiveEvent] = useState(null)
@@ -72,7 +70,7 @@ export default function RiderAssignmentSection({ order, vertical: verticalProp, 
     },
     [base, refresh],
   )
-  const { connected } = useAdminDispatchSocket(vertical, onSocketEvent, { enabled: !!id })
+  const { connected } = useAdminDispatchSocket(onSocketEvent, { enabled: !!id })
 
   const pending = isManualPending(base)
   useEffect(() => {
@@ -98,8 +96,8 @@ export default function RiderAssignmentSection({ order, vertical: verticalProp, 
         {title}
       </h3>
       <div className="space-y-3">
-        <ManualAssignStatus order={shown} vertical={vertical} onChanged={handleChanged} />
-        <AssignRiderButton order={shown} vertical={vertical} onAssigned={handleChanged} />
+        <ManualAssignStatus order={shown} onChanged={handleChanged} />
+        <AssignRiderButton order={shown} onAssigned={handleChanged} />
       </div>
     </div>
   )

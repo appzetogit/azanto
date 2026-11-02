@@ -18,8 +18,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function RestaurantLogin() {
   const companyName = useCompanyName()
-  // How this site writes its own name ("Quick Drops"), set per build; the
-  // business-settings name ("QuickDrop") otherwise.
+  // How this site writes its own name ("Azanto"), set per build; the
+  // business-settings name ("Azanto") otherwise.
   const brandName = import.meta.env.VITE_BRAND_NAME || companyName
   const navigate = useNavigate()
   const phoneInputRef = useRef(null)

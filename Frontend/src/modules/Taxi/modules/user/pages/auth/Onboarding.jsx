@@ -24,7 +24,7 @@ const FALLBACK_SLIDES = [
   {
     id: 3,
     title: 'Earn with Every Referral',
-    body: 'Share your code and earn ₹50 for every friend who joins Quick Drop.',
+    body: 'Share your code and earn ₹50 for every friend who joins Azanto.',
     image: '/man.png',
     gradientFrom: '#10B981',
     gradientTo: '#059669',

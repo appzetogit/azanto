@@ -22,7 +22,7 @@ const legalPageSchema = new mongoose.Schema(
 
 const aboutPageSchema = new mongoose.Schema(
     {
-        appName: { type: String, default: 'Quick Drop' },
+        appName: { type: String, default: 'Azanto' },
         version: { type: String, default: '1.0.0' },
         description: { type: String, default: '' },
         logo: { type: String, default: '' },

@@ -11,8 +11,8 @@ import apiClient from "@food/api/axios"
 const OPTIONS = [
   {
     key: "platform",
-    label: "Quickdrops pays",
-    detail: "Restaurant is paid without the GST on its food (Rs 100 incl. 5% at 10% commission pays Rs 85.72). Quickdrops pays that GST to the government.",
+    label: "Azanto pays",
+    detail: "Restaurant is paid without the GST on its food (Rs 100 incl. 5% at 10% commission pays Rs 85.72). Azanto pays that GST to the government.",
   },
   {
     key: "restaurant",
@@ -37,7 +37,7 @@ export default function GstPayoutControl({ restaurantId, value, hasGstin, onChan
       const saved = res?.data?.data
       setCurrent(saved?.gstPayout || key)
       onChanged?.(saved)
-      toast.success(key === "restaurant" ? "GST will be paid to the restaurant on new orders" : "Quickdrops will pay the GST on new orders")
+      toast.success(key === "restaurant" ? "GST will be paid to the restaurant on new orders" : "Azanto will pay the GST on new orders")
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not save who pays the GST")
     } finally {

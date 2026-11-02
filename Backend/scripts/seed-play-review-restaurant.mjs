@@ -16,7 +16,7 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 
 const PHONE = '7470311227';
-const NAME = 'Quick Drop Test Kitchen';
+const NAME = 'Azanto Test Kitchen';
 const TEMPLATE_NAME = 'Spice Garden Restaurant';
 const apply = process.argv.includes('--apply');
 

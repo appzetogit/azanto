@@ -175,10 +175,8 @@ export default function FeeSettings() {
     fetchFeeSettings()
     fetchDistanceRules()
     fetchZoneSurges()
-    // The quick-commerce panel mounts this same page.
-    const vertical = window.location.pathname.includes("/quick-commerce") ? "quickCommerce" : "food"
     platformSettingsAPI
-      .getEarnings(vertical)
+      .getEarnings("food")
       .then((res) => {
         const d = res?.data?.data
         setMasterFormula(d?.formula ? { source: d.formulaSource } : null)

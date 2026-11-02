@@ -46,6 +46,18 @@
 }
 
 @theme inline {
+  /* Azanto brand: the magenta of the logo, sampled from the app icon. */
+  --color-azanto-50: #fff0f6;
+  --color-azanto-100: #ffe0ec;
+  --color-azanto-200: #ffc1d9;
+  --color-azanto-300: #ff8db7;
+  --color-azanto-400: #ff4d8f;
+  --color-azanto-500: #fd0f6d;
+  --color-azanto-600: #e0005a;
+  --color-azanto-700: #b8004a;
+  --color-azanto-800: #8f003a;
+  --color-azanto-900: #5c0026;
+  --color-azanto-ink: #17141a;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

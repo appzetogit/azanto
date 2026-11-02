@@ -46,7 +46,6 @@ export default defineConfig({
       '@food/api': servicesApi,
       '@food': foodSrc,
       '@delivery': path.resolve(__dirname, './src/modules/DeliveryV2'),
-      '@sp': path.resolve(__dirname, './src/modules/ServiceProvider'),
       '@/assets': path.resolve(__dirname, './src/modules/Taxi/assets'),
       '@': path.resolve(__dirname, './src'),
     },

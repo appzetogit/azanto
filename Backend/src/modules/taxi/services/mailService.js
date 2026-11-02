@@ -22,7 +22,7 @@ const getTransporter = () => {
 export const sendEmail = async ({ to, subject, text, html }) => {
   try {
     const mailOptions = {
-      from: emailCredentials().from || '"Quick Drop" <noreply@example.com>',
+      from: emailCredentials().from || '"Azanto" <noreply@example.com>',
       to,
       subject,
       text,

@@ -10,10 +10,10 @@ const DEFAULT_TERMS_CONTENT = `
 <p>Last Updated: June 12, 2026</p>
 
 <h3>1. Acceptance of Terms</h3>
-<p>By downloading, installing, or using the Quick Drop mobile application or website (collectively, the "Services"), you agree to be bound by these Terms of Service. If you do not agree, please do not access or use the Services.</p>
+<p>By downloading, installing, or using the Azanto mobile application or website (collectively, the "Services"), you agree to be bound by these Terms of Service. If you do not agree, please do not access or use the Services.</p>
 
 <h3>2. Description of Services</h3>
-<p>Quick Drop provides a unified platform connecting users with third-party service providers, including ride-hailing drivers and food delivery partners. Quick Drop acts as a technology platform and does not itself provide transportation or food preparation services.</p>
+<p>Azanto provides a unified platform connecting users with third-party service providers, including ride-hailing drivers and food delivery partners. Azanto acts as a technology platform and does not itself provide transportation or food preparation services.</p>
 
 <h3>3. User Accounts</h3>
 <p>To use our Services, you must register using your phone number and confirm via a 4-digit verification code (OTP). You agree to provide accurate, current, and complete information during the registration process and keep your account details secure.</p>
@@ -22,10 +22,10 @@ const DEFAULT_TERMS_CONTENT = `
 <p>Fares and food orders are calculated based on distance, demand, and standard tariffs. You can pay digitally via UPI, card, net banking, or cash. All payments are securely encrypted. Refund eligibility is governed by our Refund Policy.</p>
 
 <h3>5. User Conduct and Restrictions</h3>
-<p>You agree not to use the Services for any illegal activities, harassment, or unauthorized access. Quick Drop reserves the right to terminate accounts that violate community safety guidelines or engage in fraudulent actions.</p>
+<p>You agree not to use the Services for any illegal activities, harassment, or unauthorized access. Azanto reserves the right to terminate accounts that violate community safety guidelines or engage in fraudulent actions.</p>
 
 <h3>6. Limitation of Liability</h3>
-<p>Quick Drop is not liable for direct, indirect, incidental, or consequential damages resulting from your use of the Services or interactions with third-party providers.</p>
+<p>Azanto is not liable for direct, indirect, incidental, or consequential damages resulting from your use of the Services or interactions with third-party providers.</p>
 `
 
 export default function TermsPage({ defaultTab = "terms" }) {

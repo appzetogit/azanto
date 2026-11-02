@@ -19,7 +19,7 @@ import { API_ENDPOINTS } from "@food/api/config"
 
 // Default fallback FAQs for a premium out-of-the-box experience
 const DEFAULT_HELP_CONTENT = {
-  title: "Quick Drop Support Center",
+  title: "Azanto Support Center",
   description: "We are here to help you. Browse FAQs by topic or search for answers.",
   contactEmail: "support@quickdropsindia.com",
   contactPhone: "+91 99999 88888",
@@ -29,7 +29,7 @@ const DEFAULT_HELP_CONTENT = {
       icon: "HelpCircle",
       faqs: [
         {
-          question: "How do I create an account on Quick Drop?",
+          question: "How do I create an account on Azanto?",
           answer: "Creating an account is simple! On the login screen, enter your phone number, verify the 4-digit OTP sent to your phone, enter your name if you are a new user, and you will be ready to access both our ride-hailing and food-delivery ecosystems instantly."
         },
         {
@@ -38,7 +38,7 @@ const DEFAULT_HELP_CONTENT = {
         },
         {
           question: "Can I use both food delivery and ride-hailing with a single account?",
-          answer: "Yes! Quick Drop is a unified ecosystem. You only need one phone number and one profile to seamlessly order food and book rides."
+          answer: "Yes! Azanto is a unified ecosystem. You only need one phone number and one profile to seamlessly order food and book rides."
         }
       ]
     },
@@ -55,7 +55,7 @@ const DEFAULT_HELP_CONTENT = {
           answer: "Yes, you can schedule rides. While booking, choose the 'Schedule Ride' option and pick your desired date and time. We will match you with a driver shortly before your scheduled departure."
         },
         {
-          question: "What should I do if I leave an item in a Quick Drop ride?",
+          question: "What should I do if I leave an item in a Azanto ride?",
           answer: "Please contact our support team immediately at support@quickdropsindia.com or call our hotline. Provide your ride ID, time of travel, and driver details so we can assist you in retrieving your lost item."
         }
       ]
@@ -88,7 +88,7 @@ const DEFAULT_HELP_CONTENT = {
         },
         {
           question: "How long does a refund take?",
-          answer: "Refunds for cancelled rides or food orders are processed instantly on our end. Depending on your bank or payment method, the money will reflect in your account within 3-5 business days for cards/UPI, or immediately if refunded to your Quick Drop Wallet."
+          answer: "Refunds for cancelled rides or food orders are processed instantly on our end. Depending on your bank or payment method, the money will reflect in your account within 3-5 business days for cards/UPI, or immediately if refunded to your Azanto Wallet."
         },
         {
           question: "Why did my transaction fail?",

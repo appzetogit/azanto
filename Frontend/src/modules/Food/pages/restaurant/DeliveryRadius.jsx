@@ -215,7 +215,7 @@ export default function DeliveryRadius() {
                     ? `In effect now: you deliver within ${data.effectiveRadiusKm} km of your outlet${data.usesDefault ? " (the platform radius)" : ""}.`
                     : "In effect now: you deliver across your whole zone."}
                   {data?.updatedBy &&
-                    ` Last changed by ${data.updatedBy === "admin" ? "the Quick Drop team" : "you"}${
+                    ` Last changed by ${data.updatedBy === "admin" ? "the Azanto team" : "you"}${
                       whenLabel(data.updatedAt) ? ` on ${whenLabel(data.updatedAt)}` : ""
                     }.`}
                 </p>

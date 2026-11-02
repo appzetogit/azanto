@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { useLocation, useSearchParams } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import { Search, Trash2, Loader2, Eye, Pencil, Plus, Save, ChevronDown, ThumbsUp } from "lucide-react"
 import TablePagination, { usePagination, SCROLL_TABLE_CLASS, STICKY_THEAD_CLASS } from "@food/components/admin/TablePagination"
 import { adminAPI, uploadAPI } from "@food/api"
 import apiClient from "@food/api/axios"
-import { adminPanelOf } from "@food/utils/adminPanel"
 import { toast } from "sonner"
 import { Switch } from "@food/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@food/components/ui/dialog"
@@ -44,9 +43,6 @@ const createFoodForm = () => ({
   // Dish-level order limits, as on the restaurant's own item form. 0 = none.
   minOrderQuantity: "0",
   maxOrderQuantity: "0",
-  stockQty: "",
-  lowStockThreshold: "",
-  gstRate: "",
   availabilitySchedule: buildScheduleState(null),
   suggestedItemIds: [],
 })
@@ -96,14 +92,6 @@ const createVariantDraft = (variant = {}) => ({
   // same as zero -- the dish's own limit then applies.
   minOrderQuantity: variant?.minOrderQuantity != null ? String(variant.minOrderQuantity) : "",
   maxOrderQuantity: variant?.maxOrderQuantity != null ? String(variant.maxOrderQuantity) : "",
-  // Stock per size (quick commerce and medical). Blank = not counted. The
-  // *AtLoad copies let the save send only a count the admin changed.
-  stockQty: variant?.stockQty != null ? String(variant.stockQty) : "",
-  lowStockThreshold: variant?.lowStockThreshold != null ? String(variant.lowStockThreshold) : "",
-  stockQtyAtLoad: variant?.stockQty != null ? String(variant.stockQty) : "",
-  // GST % for this size. Blank = the product's rate.
-  gstRate: variant?.gstRate != null ? String(variant.gstRate) : "",
-  lowStockAtLoad: variant?.lowStockThreshold != null ? String(variant.lowStockThreshold) : "",
   // Per-variant add-on pairings. Dropped here would mean an admin editing any
   // variant silently wipes what the restaurant paired -- the payload replaces
   // the whole variants array on save.
@@ -172,31 +160,12 @@ export default function FoodsList() {
   const [editingFood, setEditingFood] = useState(null)
   // Filters the "Goes well with" list by dish name.
   const [pairingSearch, setPairingSearch] = useState("")
-  // Stock is counted in quick commerce and medical, not food (dishes aren't).
-  const { pathname } = useLocation()
-  const isStockPanel = /^\/admin\/(quick-commerce|medical)(\/|$)/.test(pathname)
-  /** Product-level stock for the save: only what changed since the form opened. */
-  const productStockPayload = () => {
-    const was = (v) => (v === null || v === undefined ? "" : String(v))
-    const out = {}
-    const isEdit = foodFormMode === "edit"
-    if (!isEdit ? foodForm.stockQty !== "" : foodForm.stockQty !== was(editingFood?.stockQty)) {
-      out.stockQty = foodForm.stockQty === "" ? null : Number(foodForm.stockQty)
-    }
-    if (!isEdit ? foodForm.lowStockThreshold !== "" : foodForm.lowStockThreshold !== was(editingFood?.lowStockThreshold)) {
-      out.lowStockThreshold = foodForm.lowStockThreshold === "" ? null : Number(foodForm.lowStockThreshold)
-    }
-    return out
-  }
   /*
    * The shelf box follows the price until the admin touches it. The shelf price
    * and the store's name come from 99 Store settings, so neither is written
    * into this form.
    */
   const shelfCap = useValueShelfCap()
-  // The 99 store and Trending Now are food-app shelves; the quick-commerce and
-  // medical panels reuse this screen without them.
-  const isFoodPanel = adminPanelOf().vertical === "food"
   // Dishes the app's 99 store is showing right now, read from the same public
   // feed the app reads, so the tick matches what customers see whatever rule
   // the server applies.
@@ -237,15 +206,13 @@ export default function FoodsList() {
     try {
       setLoading(true)
 
-      if (isFoodPanel) {
-        apiClient
-          .get("/food/restaurant/public/foods", { params: { promo: "switch99", limit: 1000 } })
-          .then((res) => {
-            const shelf = res?.data?.data?.foods || res?.data?.foods || []
-            setOnShelfIds(new Set(shelf.map((f) => String(f?._id || f?.id || ""))))
-          })
-          .catch(() => setOnShelfIds(new Set()))
-      }
+      apiClient
+        .get("/food/restaurant/public/foods", { params: { promo: "switch99", limit: 1000 } })
+        .then((res) => {
+          const shelf = res?.data?.data?.foods || res?.data?.foods || []
+          setOnShelfIds(new Set(shelf.map((f) => String(f?._id || f?.id || ""))))
+        })
+        .catch(() => setOnShelfIds(new Set()))
       const [activeRestaurantsResponse, inactiveRestaurantsResponse] = await Promise.all([
         adminAPI.getRestaurants({ limit: 1000 }),
         adminAPI.getRestaurants({ limit: 1000, status: "inactive" }),
@@ -337,8 +304,6 @@ export default function FoodsList() {
               isTrending: f.isTrending === true,
               freeDelivery: f.freeDelivery === true,
               packagingCharge: f.packagingCharge || null,
-              stockQty: f.stockQty ?? null,
-              lowStockThreshold: f.lowStockThreshold ?? null,
               variants: getStoredFoodVariants(f),
               // Carried so the editor opens with the switch as saved: without it
               // a dish whose variants are switched off opened (and saved) on.
@@ -533,9 +498,6 @@ export default function FoodsList() {
       preparationTime: String(food.preparationTime || ""),
       minOrderQuantity: String(food.minOrderQuantity ?? 0),
       maxOrderQuantity: String(food.maxOrderQuantity ?? 0),
-      stockQty: food.stockQty != null ? String(food.stockQty) : "",
-      lowStockThreshold: food.lowStockThreshold != null ? String(food.lowStockThreshold) : "",
-      gstRate: food.gstRate != null ? String(food.gstRate) : "",
       availabilitySchedule: buildScheduleState(food.availabilitySchedule),
       suggestedItemIds: food.suggestedItemIds ?? null,
     })
@@ -696,11 +658,6 @@ export default function FoodsList() {
         maxOrderQuantity: variant?.maxOrderQuantity ?? "",
         addonIds: Array.isArray(variant?.addonIds) ? variant.addonIds : [],
         addonPrices: variant?.addonPrices || {},
-        stockQty: variant?.stockQty ?? "",
-        lowStockThreshold: variant?.lowStockThreshold ?? "",
-        stockChanged: (variant?.stockQty ?? "") !== (variant?.stockQtyAtLoad ?? ""),
-        lowChanged: (variant?.lowStockThreshold ?? "") !== (variant?.lowStockAtLoad ?? ""),
-        gstRate: variant?.gstRate ?? "",
       }))
       .filter((variant) => variant.id || variant.name || variant.price)
 
@@ -777,14 +734,12 @@ export default function FoodsList() {
         ? { showIn99Store: foodForm.showIn99Store === true }
         : {}),
       freeDelivery: foodForm.freeDelivery === true,
-      // Food items only; the server checks it like the restaurant's own form.
-      ...(isStockPanel ? {} : {
-        packagingCharge: {
-          isEnabled: foodForm.packagingEnabled === true,
-          amount: Number(foodForm.packagingAmount) || 0,
-          unitsPerCharge: Math.max(1, Math.floor(Number(foodForm.packagingUnits) || 1)),
-        },
-      }),
+      // The server checks it like the restaurant's own form.
+      packagingCharge: {
+        isEnabled: foodForm.packagingEnabled === true,
+        amount: Number(foodForm.packagingAmount) || 0,
+        unitsPerCharge: Math.max(1, Math.floor(Number(foodForm.packagingUnits) || 1)),
+      },
         otherPrice: foodForm.otherPrice === "" ? 0 : Number(foodForm.otherPrice),
         variants: normalizedVariants.map((variant) => ({
           ...(variant.id && !variant.id.startsWith("variant-") ? { _id: variant.id } : {}),
@@ -811,20 +766,7 @@ export default function FoodsList() {
             const price = raw === undefined || raw === "" ? null : Number(raw)
             return { addonId, price: Number.isFinite(price) ? price : null }
           }),
-          // Only a count the admin changed, so an open form does not put back
-          // units that orders took meanwhile. Blank = stop counting.
-          ...(isStockPanel && variant.stockChanged
-            ? { stockQty: variant.stockQty === "" ? null : Number(variant.stockQty) }
-            : {}),
-          ...(isStockPanel && variant.lowChanged
-            ? { lowStockThreshold: variant.lowStockThreshold === "" ? null : Number(variant.lowStockThreshold) }
-            : {}),
-          // Blank = the product's rate.
-          ...(isStockPanel ? { gstRate: variant.gstRate === "" ? null : Number(variant.gstRate) } : {}),
         })),
-        ...(isStockPanel && !foodForm.variantsEnabled ? productStockPayload() : {}),
-        // Blank = the order-wide rate from fee settings.
-        ...(isStockPanel ? { gstRate: foodForm.gstRate === "" ? null : Number(foodForm.gstRate) } : {}),
         description: foodForm.description.trim(),
         image: imageUrl,
         foodType: foodForm.foodType === "Veg" ? "Veg" : "Non-Veg",
@@ -965,16 +907,12 @@ export default function FoodsList() {
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider" title="The restaurant's own price; what the customer pays is shown under it when different">
                   Base Price
                 </th>
-                {isFoodPanel && (
-                  <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider" title="Showing in the app's under-price store right now">
-                    {"₹"}{shelfCap} Store
-                  </th>
-                )}
-                {isFoodPanel && (
-                  <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider" title="One flag: recommended dishes show in the app's Trending Now and in their restaurant's Recommended section. The restaurant's own menu editor switches the same flag.">
-                    Recommended
-                  </th>
-                )}
+                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider" title="Showing in the app's under-price store right now">
+                  {"₹"}{shelfCap} Store
+                </th>
+                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider" title="One flag: recommended dishes show in the app's Trending Now and in their restaurant's Recommended section. The restaurant's own menu editor switches the same flag.">
+                  Recommended
+                </th>
                 <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                   Action
                 </th>
@@ -983,7 +921,7 @@ export default function FoodsList() {
             <tbody className="bg-white divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={isFoodPanel ? 9 : 7} className="px-6 py-20 text-center">
+                  <td colSpan={9} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
                       <p className="text-sm text-slate-500">Loading foods...</p>
@@ -992,7 +930,7 @@ export default function FoodsList() {
                 </tr>
               ) : filteredFoods.length === 0 ? (
                 <tr>
-                  <td colSpan={isFoodPanel ? 9 : 7} className="px-6 py-20 text-center">
+                  <td colSpan={9} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                       <p className="text-sm text-slate-500">No food items match your search or restaurant filter</p>
@@ -1040,50 +978,46 @@ export default function FoodsList() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <BasePriceCell food={food} />
                     </td>
-                    {isFoodPanel && (
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        {/* Thumbs up, filled green: in the app's store. Faint outline: not. Click to switch. */}
-                        <button
-                          type="button"
-                          onClick={() => toggleShelf(food)}
-                          disabled={shelfBusyId === food.id}
-                          aria-pressed={onShelfIds.has(food.id)}
-                          title={onShelfIds.has(food.id) ? `In the ₹${shelfCap} store — click to remove` : `Not in the ₹${shelfCap} store — click to add`}
-                          aria-label={onShelfIds.has(food.id) ? `Remove ${food.name} from the ₹${shelfCap} store` : `Add ${food.name} to the ₹${shelfCap} store`}
-                          className="inline-flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-slate-100 disabled:opacity-50"
-                        >
-                          {shelfBusyId === food.id ? (
-                            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                          ) : onShelfIds.has(food.id) ? (
-                            <ThumbsUp className="w-5 h-5 text-emerald-600 fill-emerald-100" />
-                          ) : (
-                            <ThumbsUp className="w-5 h-5 text-slate-300 hover:text-emerald-500" />
-                          )}
-                        </button>
-                      </td>
-                    )}
-                    {isFoodPanel && (
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        {/* Thumbs up, filled orange: recommended (Trending Now + the restaurant's Recommended). Faint outline: not. Click to switch. */}
-                        <button
-                          type="button"
-                          onClick={() => toggleTrending(food)}
-                          disabled={trendingBusyId === food.id}
-                          aria-pressed={food.isTrending === true}
-                          title={food.isTrending ? "Recommended (Trending Now + restaurant's Recommended) — click to remove" : "Not recommended — click to recommend"}
-                          aria-label={food.isTrending ? `Stop recommending ${food.name}` : `Recommend ${food.name}`}
-                          className="inline-flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-slate-100 disabled:opacity-50"
-                        >
-                          {trendingBusyId === food.id ? (
-                            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                          ) : food.isTrending ? (
-                            <ThumbsUp className="w-5 h-5 text-orange-500 fill-orange-100" />
-                          ) : (
-                            <ThumbsUp className="w-5 h-5 text-slate-300 hover:text-orange-500" />
-                          )}
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {/* Thumbs up, filled green: in the app's store. Faint outline: not. Click to switch. */}
+                      <button
+                        type="button"
+                        onClick={() => toggleShelf(food)}
+                        disabled={shelfBusyId === food.id}
+                        aria-pressed={onShelfIds.has(food.id)}
+                        title={onShelfIds.has(food.id) ? `In the ₹${shelfCap} store — click to remove` : `Not in the ₹${shelfCap} store — click to add`}
+                        aria-label={onShelfIds.has(food.id) ? `Remove ${food.name} from the ₹${shelfCap} store` : `Add ${food.name} to the ₹${shelfCap} store`}
+                        className="inline-flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-slate-100 disabled:opacity-50"
+                      >
+                        {shelfBusyId === food.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                        ) : onShelfIds.has(food.id) ? (
+                          <ThumbsUp className="w-5 h-5 text-emerald-600 fill-emerald-100" />
+                        ) : (
+                          <ThumbsUp className="w-5 h-5 text-slate-300 hover:text-emerald-500" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {/* Thumbs up, filled orange: recommended (Trending Now + the restaurant's Recommended). Faint outline: not. Click to switch. */}
+                      <button
+                        type="button"
+                        onClick={() => toggleTrending(food)}
+                        disabled={trendingBusyId === food.id}
+                        aria-pressed={food.isTrending === true}
+                        title={food.isTrending ? "Recommended (Trending Now + restaurant's Recommended) — click to remove" : "Not recommended — click to recommend"}
+                        aria-label={food.isTrending ? `Stop recommending ${food.name}` : `Recommend ${food.name}`}
+                        className="inline-flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-slate-100 disabled:opacity-50"
+                      >
+                        {trendingBusyId === food.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                        ) : food.isTrending ? (
+                          <ThumbsUp className="w-5 h-5 text-orange-500 fill-orange-100" />
+                        ) : (
+                          <ThumbsUp className="w-5 h-5 text-slate-300 hover:text-orange-500" />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -1462,55 +1396,53 @@ export default function FoodsList() {
                   the platform absorbs it.
                 </p>
               </div>
-              {!isStockPanel && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Packaging charge
-                  </label>
-                  <label className="flex items-center gap-2 px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={foodForm.packagingEnabled === true}
-                      onChange={(e) => setFoodForm((prev) => ({ ...prev, packagingEnabled: e.target.checked }))}
-                      className="h-4 w-4 accent-slate-900"
-                    />
-                    <span>Charge for packaging on this dish</span>
-                  </label>
-                  {foodForm.packagingEnabled && (
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="mb-1 block text-xs text-slate-600">Charge ({"₹"})</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={foodForm.packagingAmount}
-                          onChange={(e) => setFoodForm((prev) => ({ ...prev, packagingAmount: e.target.value }))}
-                          placeholder="e.g. 10"
-                          className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="mb-1 block text-xs text-slate-600">Per how many units</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="999"
-                          step="1"
-                          value={foodForm.packagingUnits}
-                          onChange={(e) => setFoodForm((prev) => ({ ...prev, packagingUnits: e.target.value.replace(/[^0-9]/g, "") }))}
-                          className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Packaging charge
+                </label>
+                <label className="flex items-center gap-2 px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={foodForm.packagingEnabled === true}
+                    onChange={(e) => setFoodForm((prev) => ({ ...prev, packagingEnabled: e.target.checked }))}
+                    className="h-4 w-4 accent-slate-900"
+                  />
+                  <span>Charge for packaging on this dish</span>
+                </label>
+                {foodForm.packagingEnabled && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="mb-1 block text-xs text-slate-600">Charge ({"₹"})</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={foodForm.packagingAmount}
+                        onChange={(e) => setFoodForm((prev) => ({ ...prev, packagingAmount: e.target.value }))}
+                        placeholder="e.g. 10"
+                        className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
+                      />
                     </div>
-                  )}
-                  <p className="mt-1 text-xs text-slate-500">
-                    {foodForm.packagingEnabled && Number(foodForm.packagingUnits) > 1
-                      ? `1${"–"}${foodForm.packagingUnits} units pay one charge, ${Number(foodForm.packagingUnits) + 1}${"–"}${Number(foodForm.packagingUnits) * 2} pay two, and so on.`
-                      : "Applies when packaging is charged by restaurants (Packaging Charges page)."}
-                  </p>
-                </div>
-              )}
+                    <div>
+                      <span className="mb-1 block text-xs text-slate-600">Per how many units</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="999"
+                        step="1"
+                        value={foodForm.packagingUnits}
+                        onChange={(e) => setFoodForm((prev) => ({ ...prev, packagingUnits: e.target.value.replace(/[^0-9]/g, "") }))}
+                        className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+                <p className="mt-1 text-xs text-slate-500">
+                  {foodForm.packagingEnabled && Number(foodForm.packagingUnits) > 1
+                    ? `1${"–"}${foodForm.packagingUnits} units pay one charge, ${Number(foodForm.packagingUnits) + 1}${"–"}${Number(foodForm.packagingUnits) * 2} pay two, and so on.`
+                    : "Applies when packaging is charged by restaurants (Packaging Charges page)."}
+                </p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Food Type</label>
                 <select
@@ -1618,58 +1550,6 @@ export default function FoodsList() {
                 </div>
               )}
               <div>
-                {isStockPanel && (
-                  <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-sm font-medium text-slate-800">Stock</p>
-                    {foodForm.variantsEnabled ? (
-                      <p className="mt-1 text-xs text-slate-500">Sold by size: each size has its own count in the variants below, or on the Stock page.</p>
-                    ) : (
-                      <>
-                        <p className="mt-1 text-xs text-slate-500">Orders reduce it automatically. Leave empty to sell without a limit.</p>
-                        <div className="mt-2 grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">In stock</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={foodForm.stockQty}
-                              onChange={(e) => setFoodForm((prev) => ({ ...prev, stockQty: e.target.value.replace(/[^0-9]/g, "") }))}
-                              placeholder="No limit"
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Warn at <span className="text-slate-400">(optional)</span></label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={foodForm.lowStockThreshold}
-                              onChange={(e) => setFoodForm((prev) => ({ ...prev, lowStockThreshold: e.target.value.replace(/[^0-9]/g, "") }))}
-                              placeholder="No warning"
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    <div className="mt-3">
-                      <label className="block text-xs font-medium text-slate-600 mb-1">GST</label>
-                      <select
-                        value={foodForm.gstRate}
-                        onChange={(e) => setFoodForm((prev) => ({ ...prev, gstRate: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                      >
-                        <option value="">Standard rate (fee settings)</option>
-                        {GST_SLABS.map((r) => <option key={r} value={String(r)}>{r}%</option>)}
-                      </select>
-                      {foodForm.variantsEnabled && (
-                        <p className="mt-1 text-xs text-slate-500">Sizes use this unless they set their own GST below.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <label className="block text-sm font-medium text-slate-700 mb-1">Timing</label>
                 <div className="relative">
                   <select
@@ -1891,47 +1771,6 @@ export default function FoodsList() {
                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
                           />
                         </div>
-                        {isStockPanel && (
-                          <>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">In stock</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={variant.stockQty ?? ""}
-                                onChange={(e) => handleVariantChange(variant.id, "stockQty", e.target.value.replace(/[^0-9]/g, ""))}
-                                placeholder="No limit"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">
-                                Warn at <span className="text-slate-400">(optional)</span>
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={variant.lowStockThreshold ?? ""}
-                                onChange={(e) => handleVariantChange(variant.id, "lowStockThreshold", e.target.value.replace(/[^0-9]/g, ""))}
-                                placeholder="No warning"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">GST for this size</label>
-                              <select
-                                value={variant.gstRate ?? ""}
-                                onChange={(e) => handleVariantChange(variant.id, "gstRate", e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                              >
-                                <option value="">Same as product</option>
-                                {GST_SLABS.map((r) => <option key={r} value={String(r)}>{r}%</option>)}
-                              </select>
-                            </div>
-                          </>
-                        )}
 
                         {/* Add-ons paired to this size, each with its own price --
                             cheese on a large is more cheese than on a small.

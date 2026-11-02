@@ -38,7 +38,7 @@ export default function AdminSignup() {
   const [error, setError] = useState("")
   const [resendTimer, setResendTimer] = useState(0)
   const [businessLogo, setBusinessLogo] = useState(() => getCachedSettings()?.logo?.url || null)
-  const [companyName, setCompanyName] = useState(() => getCachedSettings()?.companyName || "Quick Drop")
+  const [companyName, setCompanyName] = useState(() => getCachedSettings()?.companyName || "Azanto")
   const inputRefs = useRef(Array(6).fill(null).map(() => null))
 
   const resolvedLogo = activeLogo ||

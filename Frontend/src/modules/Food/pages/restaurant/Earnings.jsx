@@ -6,8 +6,7 @@ import { restaurantAPI } from "@food/api"
 
 /*
  * Earnings, day by day: what the outlet earned from delivered orders, with
- * orders, sales and commission beside it. Serves restaurants, stores and
- * medical stores alike (requests go to /food or /qc as signed in).
+ * orders, sales and commission beside it.
  */
 
 const RANGES = [

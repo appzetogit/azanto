@@ -206,7 +206,7 @@ export default function RestaurantSignupEmail() {
         <div className="absolute inset-0 flex items-center text-white pointer-events-none">
           <div className="bg-primary-orange/80 rounded-r-full py-10 xl:py-20 pl-10 xl:pl-14 pr-10 xl:pr-20 max-w-[70%] shadow-xl backdrop-blur-[1px]">
             <h1 className="text-3xl xl:text-4xl font-extrabold mb-4 tracking-wide leading-tight">
-              JOIN Quick Drop
+              JOIN Azanto
               <br />
               FOOD PLATFORM
             </h1>

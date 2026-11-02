@@ -28,11 +28,11 @@ const ROLES = {
 
 const isDev = config.nodeEnv !== 'production';
 const DEFAULT_CREDENTIALS = {
-  adminEmail: String(process.env.DEFAULT_ADMIN_EMAIL || (isDev ? "Quick Dropindia@gmail.com" : ""))
+  adminEmail: String(process.env.DEFAULT_ADMIN_EMAIL || (isDev ? "admin@azanto.com" : ""))
     .trim()
     .toLowerCase(),
   adminPassword: String(
-    process.env.DEFAULT_ADMIN_PASSWORD || (isDev ? "sahin.Quick Drop@2004#" : ""),
+    process.env.DEFAULT_ADMIN_PASSWORD || (isDev ? "sahin.Azanto@2004#" : ""),
   ),
   userPhone: String(process.env.DEFAULT_USER_PHONE || (isDev ? "7974161582" : "")),
   restaurantPhone: String(process.env.DEFAULT_RESTAURANT_PHONE || (isDev ? "7974161582" : "")),
@@ -291,9 +291,10 @@ export const adminLogin = async (email, password) => {
     admin = await FoodAdmin.create({
       email: DEFAULT_CREDENTIALS.adminEmail,
       password: DEFAULT_CREDENTIALS.adminPassword,
-      name: "Quick Drop Admin",
+      name: "Azanto Admin",
       isActive: true,
-      servicesAccess: ["food", "quickCommerce", "taxi", "serviceProvider"],
+      // Food + taxi only: quick commerce and service-provider are switched off.
+      servicesAccess: ["food", "taxi"],
       adminLevel: "platform_superadmin",
       admin_type: "superadmin",
       permissions: ["*"]
@@ -374,9 +375,9 @@ export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform
   if (!restaurantDoc && isDefaultPhone(phone, DEFAULT_CREDENTIALS.restaurantPhone)) {
     // Auto-provision default restaurant account for configured default phone.
     restaurantDoc = await FoodRestaurant.create({
-      restaurantName: "Quick Drop Demo Restaurant",
-      ownerName: "Quick Drop Restaurant Owner",
-      ownerEmail: "restaurant@Quick Drop.com",
+      restaurantName: "Azanto Demo Restaurant",
+      ownerName: "Azanto Restaurant Owner",
+      ownerEmail: "restaurant@Azanto.com",
       ownerPhone: normalizePhone10(DEFAULT_CREDENTIALS.restaurantPhone),
       primaryContactNumber: normalizePhone10(DEFAULT_CREDENTIALS.restaurantPhone),
       city: "Bhopal",
@@ -520,7 +521,7 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
   if (!deliveryPartner && isDefaultPhone(phone, DEFAULT_CREDENTIALS.deliveryPhone)) {
     // Auto-provision default delivery account for configured default phone.
     deliveryPartner = await FoodDeliveryPartner.create({
-      name: "Quick Drop Delivery Partner",
+      name: "Azanto Delivery Partner",
       phone: normalizePhone10(DEFAULT_CREDENTIALS.deliveryPhone),
       city: "Bhopal",
       state: "Madhya Pradesh",
@@ -808,7 +809,9 @@ export const getProfile = async (userId, role) => {
 };
 
 // Every value the model accepts. This list once lacked serviceProvider, so
-// saving a profile quietly removed that access from the admin.
+// saving a profile quietly removed that access from the admin. It still lists
+// quickCommerce/medical/serviceProvider although those verticals are switched
+// off: it guards what is stored, and narrowing it would strip them on save.
 const ADMIN_SERVICES_ALLOWED = ["food", "quickCommerce", "medical", "taxi", "serviceProvider"];
 
 /** Update admin profile (name, email, phone, profileImage). Only for ADMIN role. */

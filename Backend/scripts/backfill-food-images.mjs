@@ -138,7 +138,7 @@ const fetchCandidates = async (term) => {
             iiurlwidth: 1200,
         },
         timeout: 30000,
-        headers: { 'User-Agent': 'QuickDrop/1.0 (media seeding; contact: admin@quickdrop.com)' },
+        headers: { 'User-Agent': 'Azanto/1.0 (media seeding; contact: admin@quickdrop.com)' },
     }));
 
     const pages = Object.values(data?.query?.pages || {});
