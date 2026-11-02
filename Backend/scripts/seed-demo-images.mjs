@@ -67,7 +67,7 @@ const DISH_TERMS = [
     [/paneer\s*tikka\s*pizza/i, 'paneer pizza'],
     [/paneer\s*tikka\s*sandwich/i, 'grilled sandwich'],
     [/paneer\s*tikka/i, 'paneer tikka'],
-    [/sev\s*tamatar/i, 'sev tamatar'],
+    [/sev\s*tamatar/i, 'tomato curry'],
     [/dal\s*makhani/i, 'dal makhani'],
     [/dal\s*tadka/i, 'dal tadka'],
     [/mix\s*veg/i, 'mixed vegetable curry'],
@@ -104,8 +104,8 @@ const DISH_TERMS = [
     [/dahi\s*puri/i, 'dahi puri'],
     [/aloo\s*tikki/i, 'aloo tikki chaat'],
     [/papdi/i, 'papri chaat'],
-    [/bhutte\s*ka\s*kees/i, 'bhutte ka kees'],
-    [/garadu/i, 'fried yam chaat'],
+    [/bhutte\s*ka\s*kees/i, 'sweet corn'],
+    [/garadu/i, 'yam'],
     [/pav\s*bhaji/i, 'pav bhaji'],
     [/dahi\s*vada/i, 'dahi vada'],
     [/malpua/i, 'malpua'],
@@ -312,6 +312,52 @@ async function ensureHomeCategories() {
     return out;
 }
 
+/**
+ * Which home category a dish belongs in, first match wins. The public category
+ * list only shows GLOBAL categories that approved dishes point at, so a home
+ * category with no dishes linked to it never appears. Dishes that match none
+ * keep their restaurant's own menu section.
+ */
+const HOME_LINKS = [
+    ['Thali', /thali/i],
+    ['Biryani', /biryani/i],
+    ['Pizza', /pizza/i],
+    ['Dosa', /dosa/i],
+    ['Momos', /momo/i],
+    ['Kachori', /kachori/i],
+    ['Poha', /poha/i],
+    ['Pasta', /penne|pasta/i],
+    ['Noodles', /noodle/i],
+    ['Chaat', /chaat|pani\s*puri|dahi\s*puri|papdi/i],
+    ['Paneer', /paneer/i],
+    ['Chicken', /chicken/i],
+    ['Sweets', /gulab\s*jamun|halwa|ghevar|ghewar|katli|ladoo|rasmalai|jalebi|malpua|kulfi|meetha|rabdi/i],
+    ['Coffee', /coffee|cappuccino/i],
+];
+
+async function linkDishesToHomeCategories(db, categories) {
+    const byName = new Map(categories.map(({ doc }) => [doc?.name, doc]).filter(([, doc]) => doc));
+    const items = await db.collection('food_items').find(TAG).project({ name: 1, categoryId: 1, seedRestaurantCategoryId: 1 }).toArray();
+    const counts = {};
+    for (const item of items) {
+        const match = HOME_LINKS.find(([, re]) => re.test(item.name));
+        const home = match && byName.get(match[0]);
+        if (!home) continue;
+        counts[home.name] = (counts[home.name] || 0) + 1;
+        if (dry || String(item.categoryId) === String(home._id)) continue;
+        await db.collection('food_items').updateOne({ _id: item._id }, {
+            $set: {
+                categoryId: home._id,
+                categoryName: home.name,
+                // Where it sat before, so the move can be undone by hand.
+                seedRestaurantCategoryId: item.seedRestaurantCategoryId || item.categoryId,
+                updatedAt: new Date(),
+            },
+        });
+    }
+    for (const [name, n] of Object.entries(counts)) console.log(`  ${name.padEnd(10)} ${n} dishes`);
+}
+
 async function photograph(label, term, folder, apply) {
     if (dry) {
         console.log(`  ${label.slice(0, 34).padEnd(34)} -> ${term}`);
@@ -339,6 +385,9 @@ const main = async () => {
 
     console.log(`\nHome categories${dry ? ' (dry run)' : ''}`);
     const categories = await ensureHomeCategories();
+
+    console.log('\nLinking dishes to home categories');
+    await linkDishesToHomeCategories(db, categories);
 
     console.log('\nCategory photos');
     for (const { doc, term, owned } of categories) {
