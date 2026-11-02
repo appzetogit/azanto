@@ -25,7 +25,7 @@ import '../src/config/env.js';
 import mongoose from 'mongoose';
 import axios from 'axios';
 import { connectDB, disconnectDB } from '../src/config/db.js';
-import { saveImageFromUrl } from '../src/services/storage.service.js';
+import { detectMimeType, saveImageBuffer } from '../src/services/storage.service.js';
 import { FoodCategory } from '../src/modules/food/admin/models/category.model.js';
 
 const dry = process.argv.includes('--dry');
@@ -191,6 +191,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Wikimedia throttles hard; same pacing and backoff as backfill-food-images.mjs.
 const PACE_MS = 1200;
+
+/*
+ * Wikimedia's media servers 429 almost every download from a generic User-Agent
+ * and from non-standard thumbnail widths, so this asks for a standard 960px step
+ * and identifies itself the way their robot policy asks.
+ */
+const THUMB_WIDTH = 960;
+const USER_AGENT = 'AzantoDemoSeeder/1.0 (https://azanto.buytogetherindia.com; admin@azanto.com)';
 const withRetry = async (label, fn) => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
@@ -219,10 +227,10 @@ const fetchCandidates = async (term) => {
             gsrlimit: 12,
             prop: 'imageinfo',
             iiprop: 'url|mime',
-            iiurlwidth: 1200,
+            iiurlwidth: THUMB_WIDTH,
         },
         timeout: 30000,
-        headers: { 'User-Agent': 'Azanto/1.0 (demo media seeding)' },
+        headers: { 'User-Agent': USER_AGENT },
     }));
     const urls = Object.values(data?.query?.pages || {})
         .map((p) => p?.imageinfo?.[0])
@@ -243,7 +251,13 @@ const fetchPhoto = async (term, folder, label) => {
     const index = usedPerTerm.get(term) || 0;
     usedPerTerm.set(term, index + 1);
     const chosen = candidates[index % candidates.length];
-    const stored = await withRetry(`fetch ${label}`, () => saveImageFromUrl(chosen.url, folder));
+    const { data } = await withRetry(`fetch ${label}`, () => axios.get(chosen.url, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        headers: { 'User-Agent': USER_AGENT },
+    }));
+    const buffer = Buffer.from(data);
+    const stored = await saveImageBuffer(buffer, folder, { mimeType: detectMimeType(buffer) || 'image/jpeg' });
     await sleep(PACE_MS);
     return { url: stored.url, credit: chosen.page || '', size: stored.size };
 };
