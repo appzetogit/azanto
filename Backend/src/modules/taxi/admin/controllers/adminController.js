@@ -5,6 +5,7 @@ import { BusBooking } from '../../user/models/BusBooking.js';
 import { BusService } from '../models/BusService.js';
 import { BusSeatHold } from '../../user/models/BusSeatHold.js';
 import { LandingPageSetting } from '../models/LandingPageSetting.js';
+import { createDefaultLandingPageSettings } from '../data/defaultLandingPageSettings.js';
 import { ApiError } from '../../../../utils/ApiError.js';
 
 const ok = (res, data, extra = {}) =>
@@ -1684,60 +1685,7 @@ export const getTransportTypes = asyncHandler(async (_req, res) => {
 export const getLandingPageSettings = asyncHandler(async (req, res) => {
   let settings = await LandingPageSetting.findOne({ scope: 'default' });
   if (!settings) {
-    settings = await LandingPageSetting.create({
-      scope: 'default',
-      // Hero copy, contacts, socials and store links start empty: the landing page has
-      // its own Azanto copy and hides contact rows and store badges until an admin
-      // fills them in, instead of shipping someone else's phone number.
-      video_url: '',
-      logo_url: '',
-      hero_title: '',
-      hero_description: '',
-      hero_image_url: '',
-      why_us_image_url: '',
-      social_links: { facebook: '', twitter: '', instagram: '', linkedin: '', youtube: '' },
-      contact_email: '',
-      contact_phone: '',
-      contact_address: '',
-      play_store_url: '',
-      app_store_url: '',
-      faqs: [
-        {
-          question: 'What can I do with Azanto?',
-          answer: 'Book rides (cabs, bikes, autos, parcels, airport transfers and rentals) and order food from restaurants near you, all in one app.',
-          order: 0
-        },
-        {
-          question: 'How do I book a ride?',
-          answer: 'Sign in with your phone number, set your pickup and drop, choose a vehicle and confirm. A nearby driver is assigned right away.',
-          order: 1
-        },
-        {
-          question: 'How do I pay?',
-          answer: 'Pay with UPI, cards, wallets or cash. You always see the fare or bill before you confirm.',
-          order: 2
-        },
-        {
-          question: 'How do I become a driver?',
-          answer: 'Tap "Register as driver", fill in your details and upload your licence and vehicle documents. We verify them and get you on the road.',
-          order: 3
-        },
-        {
-          question: 'How can my restaurant join?',
-          answer: 'Tap "Partner with us" and sign in with your phone number to set up your restaurant, menu and payout details.',
-          order: 4
-        }
-      ],
-      pages: {
-        about_us: '<h1>About Azanto</h1><p>Azanto is a leading technology platform dedicated to providing safe, reliable, and affordable mobility solutions for everyone. Our mission is to transform urban transportation and logistics by connecting people with professional drivers and efficient services.</p>',
-        careers: '<h1>Careers at Azanto</h1><p>Join our team and build the future of urban mobility. We are constantly looking for talented software engineers, product managers, driver relationship experts, and support specialists to join our journey.</p>',
-        newsroom: '<h1>Azanto Newsroom</h1><p>Stay updated with our latest press releases, company announcements, service launches, and regulatory breakthroughs. Azanto is growing quickly to serve more cities across Bharat.</p>',
-        terms_conditions: '<h1>Terms of Service</h1><p>By using Azanto app or website, you agree to these Terms of Service. Azanto acts as a technology platform connecting users with third-party service providers. You must provide accurate details and use the platform lawfully.</p>',
-        privacy_policy: '<h1>Privacy Policy</h1><p>We value your privacy. Azanto collects your personal information (name, contact, location) solely to match and execute rides, deliveries, and orders. We do not sell your personal data to advertisers.</p>',
-        refund_policy: '<h1>Refund Policy</h1><p>Refunds are processed for verified overcharges or cancelled bookings prior to partner dispatch. UPI and wallet refunds settle within 1 to 3 days, and bank cards settle in 5 to 10 days.</p>',
-        cancellation_policy: '<h1>Cancellation Policy</h1><p>Users may cancel bookings free of charge before a driver accepts. Nominal cancellation charges apply once a driver is assigned or dispatch preparation has already started.</p>'
-      }
-    });
+    settings = await LandingPageSetting.create(createDefaultLandingPageSettings());
   }
   return ok(res, settings);
 });
