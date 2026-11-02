@@ -306,19 +306,10 @@ const resolveJobState = async (entry) => {
             if (!order) return { known: true, terminal: true };
             return { known: true, terminal: TERMINAL[jobType].includes(String(order.orderStatus || '').toLowerCase()) };
         }
-        if (jobType === JOB_TYPES.QUICK_COMMERCE_DELIVERY) {
-            const { FoodOrder: QCOrder } = await import(
-                '../../modules/quickCommerce/modules/food/orders/models/order.model.js'
-            );
-            const order = await QCOrder.findById(jobId).select('orderStatus').lean();
-            if (!order) return { known: true, terminal: true };
-            return { known: true, terminal: TERMINAL[jobType].includes(String(order.orderStatus || '').toLowerCase()) };
-        }
-        if (jobType === JOB_TYPES.SERVICE_BOOKING) {
-            const Booking = (await import('../../modules/serviceProvider/models/Booking.js')).default;
-            const booking = await Booking.findById(jobId).select('status').lean();
-            if (!booking) return { known: true, terminal: true };
-            return { known: true, terminal: TERMINAL[jobType].includes(String(booking.status || '').toLowerCase()) };
+        // Quick commerce and service-provider were removed, so no job of theirs can
+        // still be live, and nothing else would ever release such a lock.
+        if (jobType === JOB_TYPES.QUICK_COMMERCE_DELIVERY || jobType === JOB_TYPES.SERVICE_BOOKING) {
+            return { known: true, terminal: true };
         }
     } catch (err) {
         // A lookup that FAILED is not evidence the job is over. Freeing a lock on a

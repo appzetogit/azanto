@@ -5,14 +5,14 @@
  *
  * Food and taxi customers are already the SAME documents -- both schemas declare
  * `collection: 'users'` -- so this list is a read, not a migration. Quick
- * commerce and service provider still keep their own documents, linked by
- * `platformUserId` where the backfill reached and by phone where it did not.
+ * commerce and service provider, which kept their own customer documents, are
+ * gone: rows left in those collections are not counted.
  *
  * Checked here:
  *   - one row per person, whichever vertical they came from;
  *   - search finds a phone however it was stored (+91…, 91…, bare ten digits);
  *   - orders, rides and wallet are counted per page, not per row;
- *   - a satellite document is attributed by its explicit link AND by phone;
+ *   - quick-commerce and services rows add no orders, spend or apps;
  *   - the CSV neutralises spreadsheet formulas, which is the part that would
  *     otherwise make this export a delivery mechanism.
  */
@@ -54,15 +54,13 @@ await mongoose.connection.collection('food_orders').insertMany([
 ]);
 await mongoose.connection.collection('taxirides').insertOne({ userId: vikram });
 await mongoose.connection.collection('food_user_wallets').insertOne({ userId: asha, balance: 75 });
-// A quick-commerce document with the explicit link, and a services one with only a phone.
+// Rows left behind by the removed quick-commerce and services verticals, linked
+// by platformUserId and by phone as they used to be.
 const ashaQc = (await mongoose.connection.collection('qc_users').insertOne({ platformUserId: asha, phone: '9876543210' })).insertedId;
-// Quick-commerce and medical orders live in qc_orders, keyed by the qc_users id.
-// This page used to claim they shared food_orders and counted none of them.
 await mongoose.connection.collection('qc_orders').insertMany([
   { userId: ashaQc, pricing: { total: 90 } },
   { userId: ashaQc, pricing: { total: 60 } },
 ]);
-// An unlinked qc_users row for Vikram, matched only by phone.
 const vikramQc = (await mongoose.connection.collection('qc_users').insertOne({ phone: '+919812345678' })).insertedId;
 await mongoose.connection.collection('qc_orders').insertOne({ userId: vikramQc, pricing: { total: 40 } });
 await mongoose.connection.collection('sp_users').insertOne({ phone: '+919812345678' });
@@ -79,27 +77,20 @@ await check('orders, spend, rides and wallet are attributed correctly', async ()
   const a = users.find((u) => u.name === 'Asha Rao');
   const v = users.find((u) => u.name === 'Vikram Singh');
   assert.equal(a.foodOrders, 2);
-  assert.equal(a.quickOrders, 2, 'grocery and pharmacy orders were not counted');
-  assert.equal(a.orders, 4);
-  assert.equal(a.orderValue, 550, 'food 400 + quick 150');
+  assert.equal(a.orders, 2);
+  assert.equal(a.orderValue, 400);
   assert.equal(a.walletBalance, 75);
   assert.equal(a.rides, 0);
   assert.equal(v.rides, 1);
   assert.equal(v.foodOrders, 0);
-  assert.equal(v.quickOrders, 1, 'an order under an unlinked qc_users row, matched by phone');
-  assert.equal(v.orderValue, 40);
+  assert.equal(v.orderValue, 0);
+  assert.equal(a.quickOrders, undefined);
 });
 
-await check('a linked quick-commerce account shows against its owner', async () => {
-  const { users } = await listGlobalUsers({ search: 'Asha' });
-  assert.ok(users[0].apps.includes('quick'), `apps were ${users[0].apps}`);
-});
-
-await check('an UNLINKED services account is still matched, by phone', async () => {
-  // sp_users has no platformUserId and stores +91XXXXXXXXXX; the user row is bare
-  // ten digits. This is the fallback the backfill has not reached yet.
-  const { users } = await listGlobalUsers({ search: 'Vikram' });
-  assert.ok(users[0].apps.includes('services'), `apps were ${users[0].apps}`);
+await check('apps come from food and taxi only', async () => {
+  const { users } = await listGlobalUsers({});
+  const apps = Object.fromEntries(users.map((u) => [u.name, u.apps]));
+  assert.deepEqual(apps, { 'Asha Rao': ['food'], 'Vikram Singh': ['taxi'] });
 });
 
 await check('a phone is found however it was typed', async () => {

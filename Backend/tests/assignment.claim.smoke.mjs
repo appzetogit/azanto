@@ -11,13 +11,13 @@
  *     one driver must produce exactly one winner;
  *   - the MIRROR. activeAssignment is kept equal to activeAssignments[0] so the old
  *     primitive and three dispatchers keep working untouched. If the mirror is
- *     wrong in either direction, food and taxi double-book QC riders again -- the
+ *     wrong in either direction, food and taxi double-book riders again -- the
  *     hole this whole change exists to close;
  *   - the two release/claim hazards found while writing it: a release that clears
  *     a lock belonging to a different job, and a driver locked before the array
  *     existed reading as free;
- *   - reconcile knowing quick-commerce orders live in their own collection, without
- *     which every QC lock would be judged stale and cleared on sight.
+ *   - reconcile keeping a lock on a live order and clearing a finished one, and
+ *     clearing any lock left by a removed vertical (quick commerce, services).
  */
 import assert from 'assert';
 import mongoose from 'mongoose';
@@ -57,12 +57,12 @@ async function main() {
   await test('a free driver can be claimed, and the mirror follows', async () => {
     const d = await newDriver();
     const job = oid();
-    const r = await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: job });
+    const r = await claimAssignment(d._id, { vertical: 'food', jobId: job });
     assert.equal(r.claimed, true);
 
     const fresh = await read(d._id);
     assert.equal(fresh.activeAssignments.length, 1);
-    assert.equal(fresh.activeAssignments[0].jobType, 'quickCommerceDelivery');
+    assert.equal(fresh.activeAssignments[0].jobType, 'foodDelivery');
     assert.equal(String(fresh.activeAssignment.id), String(job), 'mirror must point at the job');
     assert.equal(fresh.activeAssignment.type, 'delivery');
   });
@@ -73,9 +73,9 @@ async function main() {
     assert.equal((await read(d._id)).activeAssignment.type, 'ride');
   });
 
-  await test('THE LIVE HOLE: a driver on a QC order cannot be claimed for a ride', async () => {
+  await test('THE LIVE HOLE: a driver on a food order cannot be claimed for a ride', async () => {
     const d = await newDriver();
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() });
+    await claimAssignment(d._id, { vertical: 'food', jobId: oid() });
     const r = await claimAssignment(d._id, { vertical: 'taxi', jobId: oid() });
     assert.equal(r.claimed, false);
     assert.equal((await read(d._id)).activeAssignments.length, 1);
@@ -100,14 +100,14 @@ async function main() {
   // --- interoperability with the old primitive -----------------------------
   console.log('\nthe old primitive and the new one see each other');
 
-  await test('a QC claim BLOCKS the old food/taxi acquire, via the mirror', async () => {
+  await test('a master claim BLOCKS the old food/taxi acquire, via the mirror', async () => {
     /*
      * The reason the mirror exists. Food and taxi still call
-     * acquireDriverAssignment, which only looks at activeAssignment. If a QC claim
-     * did not set it, food would happily take a rider already carrying groceries.
+     * acquireDriverAssignment, which only looks at activeAssignment. If a claim did
+     * not set it, food would happily take a rider already carrying an order.
      */
     const d = await newDriver();
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() });
+    await claimAssignment(d._id, { vertical: 'food', jobId: oid() });
     assert.equal(await acquireDriverAssignment(d._id, 'ride', oid()), false);
     assert.equal(await acquireDriverAssignment(d._id, 'delivery', oid()), false);
   });
@@ -124,7 +124,7 @@ async function main() {
       $set: { activeAssignment: { type: 'ride', id: oid(), at: new Date() } },
       $unset: { activeAssignments: '' },
     });
-    const r = await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() });
+    const r = await claimAssignment(d._id, { vertical: 'food', jobId: oid() });
     assert.equal(r.claimed, false, 'a legacy-locked driver must not be claimable');
   });
 
@@ -134,7 +134,7 @@ async function main() {
   await test('the old acquire now writes activeAssignments, not just the mirror', async () => {
     /*
      * The point of the wiring. Before it, food and taxi wrote only activeAssignment
-     * while QC wrote the array: two primitives deciding one question. Now the array
+     * while the master claim wrote the array: two primitives deciding one question. Now the array
      * is the record for every vertical.
      */
     const d = await newDriver();
@@ -168,7 +168,7 @@ async function main() {
   await test('forceClear empties the array as well as the mirror', async () => {
     const { forceClearDriverAssignment } = await import('../src/modules/taxi/driver/services/driverAssignmentService.js');
     const d = await newDriver();
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() });
+    await claimAssignment(d._id, { vertical: 'food', jobId: oid() });
     assert.equal(await forceClearDriverAssignment(d._id), true);
     const fresh = await read(d._id);
     assert.equal(fresh.activeAssignment, null);
@@ -179,26 +179,25 @@ async function main() {
   // --- concurrency ---------------------------------------------------------
   console.log('\nconcurrency');
 
-  await test('three verticals racing for one driver: exactly one wins', async () => {
+  await test('three claims racing for one driver: exactly one wins', async () => {
     const d = await newDriver();
     const verdicts = await Promise.all([
       claimAssignment(d._id, { vertical: 'food', jobId: oid() }),
-      claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() }),
+      claimAssignment(d._id, { vertical: 'food', jobId: oid() }),
       claimAssignment(d._id, { vertical: 'taxi', jobId: oid() }),
     ]);
-    assert.equal(verdicts.filter((v) => v.claimed).length, 1, 'only one vertical may win');
+    assert.equal(verdicts.filter((v) => v.claimed).length, 1, 'only one claim may win');
     const fresh = await read(d._id);
     assert.equal(fresh.activeAssignments.length, 1, 'and only one entry may exist');
   });
 
   await test('the new claim racing the OLD acquire: still exactly one winner', async () => {
-    // During the transition food and taxi use one primitive and QC the other.
-    // The race between them is the realistic one.
+    // The old acquire and the master claim must agree when they race.
     let wins = 0;
     for (let i = 0; i < 10; i += 1) {
       const d = await newDriver();
       const [a, b] = await Promise.all([
-        claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() }),
+        claimAssignment(d._id, { vertical: 'food', jobId: oid() }),
         acquireDriverAssignment(d._id, 'ride', oid()),
       ]);
       const winners = (a.claimed ? 1 : 0) + (b ? 1 : 0);
@@ -220,12 +219,12 @@ async function main() {
   // --- stacking, when a policy permits it ----------------------------------
   console.log('\nstacking');
 
-  await test('Food + QC stack under a policy that permits it; Taxi still refused', async () => {
+  await test('Food + Food stack under a policy that permits it; Taxi still refused', async () => {
     const d = await newDriver();
     await Driver.updateOne({ _id: d._id }, { $unset: { activeAssignment: '' } });
     const policy = { policy: EXAMPLE_STACKING_POLICY };
     assert.equal((await claimAssignment(d._id, { vertical: 'food', jobId: oid() }, policy)).claimed, true);
-    assert.equal((await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() }, policy)).claimed, true);
+    assert.equal((await claimAssignment(d._id, { vertical: 'food', jobId: oid() }, policy)).claimed, true);
     assert.equal((await claimAssignment(d._id, { vertical: 'taxi', jobId: oid() }, policy)).claimed, false);
   });
 
@@ -235,7 +234,7 @@ async function main() {
   await test('releasing the job held frees the driver and clears the mirror', async () => {
     const d = await newDriver();
     const job = oid();
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: job });
+    await claimAssignment(d._id, { vertical: 'food', jobId: job });
     assert.equal(await releaseAssignment(d._id, job), true);
     const fresh = await read(d._id);
     assert.equal(fresh.activeAssignments.length, 0);
@@ -288,7 +287,7 @@ async function main() {
     const first = oid();
     const second = oid();
     await claimAssignment(d._id, { vertical: 'food', jobId: first }, policy);
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: second }, policy);
+    await claimAssignment(d._id, { vertical: 'food', jobId: second }, policy);
 
     await releaseAssignment(d._id, first);
     const fresh = await read(d._id);
@@ -296,40 +295,46 @@ async function main() {
     assert.equal(String(fresh.activeAssignment.id), String(second), 'the mirror must follow what is still held');
   });
 
-  // --- reconcile knows about quick commerce --------------------------------
-  console.log('\nreconcile, across verticals');
+  // --- reconcile -------------------------------------------------------------
+  console.log('\nreconcile');
 
-  const { FoodOrder: QCOrder } =
-    await import('../src/modules/quickCommerce/modules/food/orders/models/order.model.js');
+  const { FoodOrder } = await import('../src/modules/food/orders/models/order.model.js');
 
-  await test('a QC lock on a LIVE qc_orders order is NOT cleared', async () => {
-    /*
-     * The bug that made QC unable to use the old primitive at all: the old
-     * reconcile looked every delivery up in food_orders, found nothing, and cleared
-     * the lock -- handing the rider a second job while still carrying the first.
-     */
+  await test('a food lock on a LIVE order is NOT cleared', async () => {
     const d = await newDriver();
     const orderId = oid();
-    await QCOrder.collection.insertOne({ _id: orderId, orderStatus: 'picked_up' });
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: orderId });
+    await FoodOrder.collection.insertOne({ _id: orderId, orderStatus: 'picked_up' });
+    await claimAssignment(d._id, { vertical: 'food', jobId: orderId });
 
-    assert.equal(await reconcileAssignments(d._id), 0, 'a live QC order must keep its lock');
+    assert.equal(await reconcileAssignments(d._id), 0, 'a live order must keep its lock');
     assert.equal((await read(d._id)).activeAssignments.length, 1);
   });
 
-  await test('a QC lock on a DELIVERED order is cleared', async () => {
+  await test('a food lock on a DELIVERED order is cleared', async () => {
     const d = await newDriver();
     const orderId = oid();
-    await QCOrder.collection.insertOne({ _id: orderId, orderStatus: 'delivered' });
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: orderId });
+    await FoodOrder.collection.insertOne({ _id: orderId, orderStatus: 'delivered' });
+    await claimAssignment(d._id, { vertical: 'food', jobId: orderId });
     assert.equal(await reconcileAssignments(d._id), 1);
     assert.equal((await read(d._id)).activeAssignment, null);
   });
 
-  await test('a QC lock whose order no longer exists is cleared', async () => {
+  await test('a food lock whose order no longer exists is cleared', async () => {
     const d = await newDriver();
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: oid() });
+    await claimAssignment(d._id, { vertical: 'food', jobId: oid() });
     assert.equal(await reconcileAssignments(d._id), 1);
+  });
+
+  await test('a lock left by a removed vertical is cleared, whatever its old collection says', async () => {
+    // Quick commerce and services are gone, so nothing else would ever release it.
+    for (const vertical of ['quickCommerce', 'serviceProvider']) {
+      const d = await newDriver();
+      const jobId = oid();
+      await mongoose.connection.collection('qc_orders').insertOne({ _id: jobId, orderStatus: 'picked_up' });
+      await claimAssignment(d._id, { vertical, jobId });
+      assert.equal(await reconcileAssignments(d._id), 1, vertical);
+      assert.equal((await read(d._id)).activeAssignment, null, vertical);
+    }
   });
 
   await test('reconcile only clears the finished job when two are held', async () => {
@@ -337,13 +342,13 @@ async function main() {
     await Driver.updateOne({ _id: d._id }, { $unset: { activeAssignment: '' } });
     const live = oid();
     const done = oid();
-    await QCOrder.collection.insertMany([
+    await FoodOrder.collection.insertMany([
       { _id: live, orderStatus: 'picked_up' },
       { _id: done, orderStatus: 'delivered' },
     ]);
     const policy = { policy: EXAMPLE_STACKING_POLICY };
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: live }, policy);
-    await claimAssignment(d._id, { vertical: 'quickCommerce', jobId: done }, policy);
+    await claimAssignment(d._id, { vertical: 'food', jobId: live }, policy);
+    await claimAssignment(d._id, { vertical: 'food', jobId: done }, policy);
 
     assert.equal(await reconcileAssignments(d._id), 1);
     const fresh = await read(d._id);

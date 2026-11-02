@@ -5,10 +5,11 @@
  *
  * Every figure below is worked out by hand from the seeded records, so the
  * report is checked against arithmetic, not against itself:
- *   - Food and Quick use only DELIVERED orders placed in the range, and the
- *     platform's share each service already recorded (platformNetProfit);
+ *   - Food uses only DELIVERED orders placed in the range, and the platform's
+ *     share it already recorded (platformNetProfit);
  *   - Taxi: fare - driver credit - insurance, for rides completed in range;
- *   - Services: paid bills' company revenue less GST;
+ *   - quick commerce and services are gone: rows left in their collections
+ *     are not reported, and nothing of theirs reaches the totals;
  *   - GST is reported beside income, never inside it;
  *   - the breakdown lines add up to the net;
  *   - a sub-admin sees only services they have Reports access for.
@@ -64,6 +65,7 @@ const seedStore = async (orders, transactions, rows) => {
   }
 };
 await seedStore('food_orders', 'food_transactions', food);
+// Rows left behind by the removed quick-commerce vertical.
 await seedStore('qc_orders', 'qc_transactions', [
   { status: 'delivered', at: ist('2026-09-05'), gross: 200, gst: 10, commission: 20, platformFee: 5, deliveryFee: 25, surge: 0, rider: 25, rest: 165, net: 22 },
 ]);
@@ -76,7 +78,7 @@ await db.collection('taxirides').insertMany([
   { status: 'completed', completedAt: ist('2026-09-11', '00:30'), fare: 999, driverEarnings: 0 },
 ]);
 
-// --- Services: one paid bill in range, one draft.
+// --- Left behind by the removed services vertical: one paid bill in range, one draft.
 await db.collection('sp_vendor_bills').insertMany([
   { status: 'paid', paidAt: ist('2026-09-08'), grandTotal: 1180, totalGST: 180, vendorTotalEarning: 640, companyRevenue: 540, totalServiceBase: 900, vendorServiceEarning: 630, totalPartsBase: 100, vendorPartsEarning: 10 },
   { status: 'draft', paidAt: ist('2026-09-08'), grandTotal: 999, totalGST: 9, vendorTotalEarning: 9, companyRevenue: 999 },
@@ -109,11 +111,9 @@ await check('an order late on the last day of August (India time) is not in Sept
   assert.equal(aug.services.find((s) => s.key === 'food').count, 1);
 });
 
-console.log('\nQuick & Medical');
-await check('its own transactions and orders', async () => {
-  assert.equal(by.quick.count, 1);
-  assert.equal(by.quick.net, 22);
-  assert.equal(by.quick.gst, 10);
+console.log('\nOnly Food and Taxi');
+await check('quick commerce and services are not reported', async () => {
+  assert.deepEqual(report.services.map((s) => s.key), ['food', 'taxi']);
 });
 
 console.log('\nTaxi');
@@ -131,28 +131,18 @@ await check('commission, incentives and promos explain it; the rest is recovered
   assert.equal(by.taxi.lines.reduce((a, l) => a + l.amount, 0), by.taxi.net);
 });
 
-console.log('\nServices');
-await check('paid bills only, company revenue less GST', async () => {
-  assert.equal(by.services.count, 1);
-  assert.equal(by.services.net, 360);
-  assert.equal(by.services.gst, 180);
-  assert.equal(line('services', 'serviceShare'), 270);
-  assert.equal(line('services', 'partsShare'), 90);
-  assert.equal(line('services', 'other'), 0);
-});
-
 console.log('\nTotals and the chart');
 await check('totals are the sum of the services', async () => {
-  assert.equal(report.totals.net, 120 + 22 + 65 + 360);
-  assert.equal(report.totals.gst, 35 + 10 + 180);
-  assert.equal(report.totals.gross, 800 + 200 + 400 + 1180);
+  assert.equal(report.totals.net, 120 + 65);
+  assert.equal(report.totals.gst, 35);
+  assert.equal(report.totals.gross, 800 + 400);
 });
 await check('every day in the range is present, with each service\'s share', async () => {
   assert.equal(report.daily.length, 10);
   assert.equal(report.daily[0].date, '2026-09-01');
   const sep5 = report.daily.find((d) => d.date === '2026-09-05');
-  assert.deepEqual(sep5.byService, { food: 40, quick: 22, taxi: 45 });
-  assert.equal(sep5.total, 107);
+  assert.deepEqual(sep5.byService, { food: 40, taxi: 45 });
+  assert.equal(sep5.total, 85);
   assert.equal(report.daily.reduce((a, d) => a + d.total, 0), report.totals.net);
 });
 await check('a bad range is refused; no range means the last 30 days', async () => {

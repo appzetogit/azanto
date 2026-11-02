@@ -7,7 +7,7 @@ const PARTNERS = [
     body: 'Earn on your own schedule with weekly payouts and steady trip demand.',
     points: ['Flexible hours', 'Fast onboarding', 'Transparent earnings'],
     cta: 'Register as driver',
-    href: '/taxi/signup',
+    href: '/taxi/driver',
   },
   {
     Icon: Store,

@@ -1,26 +1,17 @@
 /**
- * Logging out must not be able to fail -- in either auth stack.
+ * Logging out must not be able to fail.
  *
  * A rejected logout is not a cosmetic 400: the controller aborts before the
  * fcmToken is unregistered, so the device stays subscribed and a logged-out
  * user keeps receiving push notifications. The cases below are the shapes real
  * clients were observed sending: a null token, and no token field at all.
  *
- * Both validators are exercised here on purpose. The app runs two parallel auth
- * stacks -- src/dtos/auth (mounted at /v1/food/auth) and
- * src/modules/quickCommerce/dtos/auth (mounted at /v1/qc/auth) -- with
- * near-identical code. Fixing one and assuming the other followed is exactly
- * the mistake that left /v1/food/auth/logout still returning 400 after the QC
- * side was repaired, so they are asserted together to keep them from drifting.
- *
  * Run: node src/dtos/auth/__checks__/logout.check.js
  */
 import { validateLogoutDto as validateFood } from '../logout.dto.js';
-import { validateLogoutDto as validateQc } from '../../../modules/quickCommerce/dtos/auth/logout.dto.js';
 
 const STACKS = [
     ['food (/v1/food/auth)', validateFood],
-    ['qc   (/v1/qc/auth)', validateQc],
 ];
 
 let failures = 0;
@@ -77,5 +68,5 @@ for (const [stack, validate] of STACKS) {
     rejects(stack, validate, 'non-string refreshToken still rejected', { refreshToken: 42 });
 }
 
-console.log(failures ? `\n${failures} FAILED` : '\nall logout DTO checks passed (both stacks)');
+console.log(failures ? `\n${failures} FAILED` : '\nall logout DTO checks passed');
 process.exit(failures ? 1 : 0);

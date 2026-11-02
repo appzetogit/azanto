@@ -6,12 +6,11 @@ import { Activity } from './activity.model.js';
  * GET /api/v1/me/activity — the customer's history across every vertical.
  *
  * Query: ?status=pending|active|completed|cancelled
- *        ?vertical=food|quickCommerce|taxi|serviceProvider
+ *        ?vertical=food|taxi
  *        ?limit=20&skip=0
  *
- * The caller is identified by their token, then resolved to the id they carry in each
- * vertical (see identityResolver) -- querying the token id alone would silently omit
- * service-provider and quick-commerce, which key on their own user documents.
+ * The caller is identified by their token, then resolved to the ids they carry across
+ * verticals (see identityResolver).
  */
 export const getMyActivityController = async (req, res, next) => {
     try {

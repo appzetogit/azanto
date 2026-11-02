@@ -85,7 +85,7 @@ export async function withFinanceLock(key, fn, {
  */
 export const riderWithdrawalLockKey = async (anyId) => {
     const identity = await resolveRiderIdentity(anyId);
-    return `rider-withdrawal:${String(identity.driverId || identity.foodPartnerId || identity.qcPartnerId || anyId)}`;
+    return `rider-withdrawal:${String(identity.driverId || identity.foodPartnerId || anyId)}`;
 };
 
 export const restaurantWithdrawalLockKey = (restaurantId) => `restaurant-withdrawal:${String(restaurantId)}`;

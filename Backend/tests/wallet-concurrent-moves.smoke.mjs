@@ -7,11 +7,11 @@
  * onto the embedded transactions array, write the document back. Two moves on
  * one wallet then raced.
  *
- * The credit side surfaced first, in qc-return-payout, which failed about one
- * run in three with Mongoose's own words -- "No matching document found for id
- * ... modifiedPaths transactions, balance". One customer returning two items
- * is two refunds at once: the second threw, and they were paid for one return
- * until somebody retried the other by hand.
+ * The credit side surfaced first, in a return payout test, which failed about
+ * one run in three with Mongoose's own words -- "No matching document found for
+ * id ... modifiedPaths transactions, balance". Two refunds at once: the second
+ * threw, and the customer was paid for one until somebody retried the other by
+ * hand.
  *
  * The debit side is the one that costs money the other way. The balance check
  * was a separate read before the save, so two orders paid from one wallet
@@ -28,11 +28,7 @@ const server = await MongoMemoryServer.create();
 process.env.MONGODB_URI = server.getUri();
 await mongoose.connect(server.getUri(), { dbName: 'wallet_concurrency' });
 
-// Two collections, one per vertical: QC writes qc_user_wallets and food writes
-// its own, so a balance has to be read from the same side that wrote it.
-const { FoodUserWallet } = await import('../src/modules/quickCommerce/modules/food/user/models/userWallet.model.js');
-const { FoodUserWallet: FoodSideWallet } = await import('../src/modules/food/user/models/userWallet.model.js');
-const qcWallet = await import('../src/modules/quickCommerce/modules/food/user/services/userWallet.service.js');
+const { FoodUserWallet } = await import('../src/modules/food/user/models/userWallet.model.js');
 const foodWallet = await import('../src/modules/food/user/services/userWallet.service.js');
 
 let failures = 0;
@@ -47,12 +43,12 @@ const check = async (label, fn) => {
 };
 
 const newUser = () => new mongoose.Types.ObjectId();
-const balanceOf = async (userId, model = FoodUserWallet) => {
-    const doc = await model.findOne({ userId }).lean();
+const balanceOf = async (userId) => {
+    const doc = await FoodUserWallet.findOne({ userId }).lean();
     return Number(doc?.balance) || 0;
 };
-const rowsOf = async (userId, model = FoodUserWallet) => {
-    const doc = await model.findOne({ userId }).lean();
+const rowsOf = async (userId) => {
+    const doc = await FoodUserWallet.findOne({ userId }).lean();
     return (doc?.transactions || []).length;
 };
 
@@ -60,8 +56,8 @@ console.log('\ntwo refunds landing together');
 {
     const user = newUser();
     const results = await Promise.allSettled([
-        qcWallet.refundWalletBalance(user, 118, 'Refund A'),
-        qcWallet.refundWalletBalance(user, 150.4, 'Refund B'),
+        foodWallet.refundWalletBalance(user, 118, 'Refund A'),
+        foodWallet.refundWalletBalance(user, 150.4, 'Refund B'),
     ]);
     await check('THE BUG: neither is rejected by a version conflict', () => {
         const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason?.message);
@@ -75,7 +71,7 @@ console.log('\ntwo refunds landing together');
 console.log('\nten at once, which is a support agent and a job racing');
 {
     const user = newUser();
-    await Promise.all(Array.from({ length: 10 }, (_, i) => qcWallet.refundWalletBalance(user, 10, `R${i}`)));
+    await Promise.all(Array.from({ length: 10 }, (_, i) => foodWallet.refundWalletBalance(user, 10, `R${i}`)));
     await check('every one lands', async () => {
         assert.equal(await balanceOf(user), 100);
         assert.equal(await rowsOf(user), 10);
@@ -85,10 +81,10 @@ console.log('\nten at once, which is a support agent and a job racing');
 console.log('\ntwo orders paid from one wallet at the same moment');
 {
     const user = newUser();
-    await qcWallet.refundWalletBalance(user, 100, 'Top-up');
+    await foodWallet.refundWalletBalance(user, 100, 'Top-up');
     const results = await Promise.allSettled([
-        qcWallet.deductWalletBalance(user, 80, 'Order A'),
-        qcWallet.deductWalletBalance(user, 80, 'Order B'),
+        foodWallet.deductWalletBalance(user, 80, 'Order A'),
+        foodWallet.deductWalletBalance(user, 80, 'Order B'),
     ]);
     await check('THE BUG IT PREVENTS: the wallet cannot go negative', async () => {
         const balance = await balanceOf(user);
@@ -102,44 +98,23 @@ console.log('\ntwo orders paid from one wallet at the same moment');
     });
 }
 
-console.log('\nthe food wallet, which carries the same code');
-{
-    const user = newUser();
-    const results = await Promise.allSettled([
-        foodWallet.refundWalletBalance(user, 60, 'Refund A'),
-        foodWallet.refundWalletBalance(user, 40, 'Refund B'),
-    ]);
-    await check('two refunds both land there too', async () => {
-        assert.deepEqual(results.filter((r) => r.status === 'rejected').map((r) => r.reason?.message), []);
-        assert.equal(await balanceOf(user, FoodSideWallet), 100);
-    });
-    await check('and it will not overdraw', async () => {
-        const out = await Promise.allSettled([
-            foodWallet.deductWalletBalance(user, 70, 'Order A'),
-            foodWallet.deductWalletBalance(user, 70, 'Order B'),
-        ]);
-        assert.equal(out.filter((r) => r.status === 'rejected').length, 1);
-        assert.equal(await balanceOf(user, FoodSideWallet), 30);
-    });
-}
-
 console.log('\nthe ordinary single move still behaves');
 {
     const user = newUser();
-    await qcWallet.refundWalletBalance(user, 55.75, 'One refund');
+    await foodWallet.refundWalletBalance(user, 55.75, 'One refund');
     await check('credits the amount and records one row', async () => {
         assert.equal(await balanceOf(user), 55.75);
         assert.equal(await rowsOf(user), 1);
     });
     await check('a nonsense amount changes nothing', async () => {
-        await qcWallet.refundWalletBalance(user, -10, 'Nonsense');
-        await qcWallet.refundWalletBalance(user, 0, 'Nothing');
+        await foodWallet.refundWalletBalance(user, -10, 'Nonsense');
+        await foodWallet.refundWalletBalance(user, 0, 'Nothing');
         assert.equal(await balanceOf(user), 55.75);
         assert.equal(await rowsOf(user), 1);
     });
     await check('a debit larger than the balance is refused', async () => {
         await assert.rejects(
-            () => qcWallet.deductWalletBalance(user, 500, 'Too much'),
+            () => foodWallet.deductWalletBalance(user, 500, 'Too much'),
             /Insufficient wallet balance/,
         );
         assert.equal(await balanceOf(user), 55.75);

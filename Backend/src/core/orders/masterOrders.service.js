@@ -4,18 +4,17 @@ import { ValidationError } from '../auth/errors.js';
 /**
  * Master > Orders: every order on the platform, in one list.
  *
- * Food (food_orders), Quick and Medical (qc_orders; Medical = an MED- order or a
- * pharmacy store) and Taxi/Parcel (rides) live in separate collections with
+ * Food (food_orders) and Taxi/Parcel (rides) live in separate collections with
  * separate admin screens. This reads them side by side and hands back one row
  * shape, so the Master panel can show them together, per tab, and assign a
- * rider to a Food / Quick / Medical order without leaving the page (the assign
- * calls themselves go to each vertical's own admin API).
+ * rider to a Food order without leaving the page (the assign calls themselves
+ * go to Food's own admin API).
  *
  * Read only. Status changes and refunds stay on each vertical's screen, whose
  * rules (refunds, ledgers, stock) this list does not duplicate.
  */
 
-export const MASTER_ORDER_TABS = ['all', 'food', 'quick', 'medical', 'taxi', 'parcel'];
+export const MASTER_ORDER_TABS = ['all', 'food', 'taxi', 'parcel'];
 
 /** Order states, grouped the way the filter offers them. */
 const ORDER_STATUS_GROUPS = {
@@ -30,12 +29,11 @@ const RIDE_STATUS_GROUPS = {
 };
 
 const models = async () => {
-    const [{ FoodOrder }, { FoodOrder: QcOrder }, { Ride }] = await Promise.all([
+    const [{ FoodOrder }, { Ride }] = await Promise.all([
         import('../../modules/food/orders/models/order.model.js'),
-        import('../../modules/quickCommerce/modules/food/orders/models/order.model.js'),
         import('../../modules/taxi/user/models/Ride.js'),
     ]);
-    return { FoodOrder, QcOrder, Ride };
+    return { FoodOrder, Ride };
 };
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -64,12 +62,8 @@ const filtersFor = (tab, { status, search }) => {
         ...(term && mongoose.Types.ObjectId.isValid(term) ? { _id: new mongoose.Types.ObjectId(term) } : {}),
         ...(term && !mongoose.Types.ObjectId.isValid(term) ? { _id: null } : {}),
     });
-    const medical = { $or: [{ order_id: /^MED-/ }, { prescriptionOnly: true }, { 'prescription.required': true }] };
-    const notMedical = { $nor: medical.$or };
     const out = {
         food: ['all', 'food'].includes(tab) ? withStatus({}) : null,
-        quick: ['all', 'quick'].includes(tab) ? withStatus(notMedical) : null,
-        medical: ['all', 'medical'].includes(tab) ? withStatus(medical) : null,
         taxi: ['all', 'taxi'].includes(tab) ? rideBase('ride') : null,
         parcel: ['all', 'parcel'].includes(tab) ? rideBase('parcel') : null,
     };
@@ -104,8 +98,8 @@ const orderRow = (o, source, maps) => {
     return {
         _id: String(o._id),
         orderId: o.order_id || o.orderId || String(o._id),
-        source, // food | quick | medical
-        vertical: source === 'food' ? 'food' : 'quickCommerce', // what the assign API calls it
+        source, // food
+        vertical: 'food', // what the assign API calls it
         orderStatus: o.orderStatus || '',
         status: o.orderStatus || '',
         customerName: pickName(user, 'name', 'fullName') || pickName(o.deliveryAddress, 'fullName', 'name') || 'Customer',
@@ -164,15 +158,14 @@ const RIDE_IN_PROGRESS = ['searching', 'accepted', 'ongoing', 'arriving', 'start
 /**
  * Delete one order from Master > All Orders, through the service that owns it.
  *
- * Food, Quick and Medical go to their own admin delete, which returns stock and
- * refuses an order that was delivered or paid (its payment and payouts stay on
+ * Food goes to its own admin delete, which returns stock and refuses an order that was delivered or paid (its payment and payouts stay on
  * record). Taxi and parcel trips use taxi's own delete, which hides the trip
  * and keeps its fare records. An order still in progress is refused here:
  * cancel it first.
  */
 export async function deleteMasterOrder({ source, id, adminId = '' } = {}) {
     if (!mongoose.Types.ObjectId.isValid(String(id))) throw new ValidationError('Invalid order id');
-    const { FoodOrder, QcOrder, Ride } = await models();
+    const { FoodOrder, Ride } = await models();
 
     if (source === 'taxi' || source === 'parcel') {
         const ride = await Ride.findById(id).select('status liveStatus adminHiddenAt').lean();
@@ -185,16 +178,13 @@ export async function deleteMasterOrder({ source, id, adminId = '' } = {}) {
         return removeRideFromTrips(id, adminId);
     }
 
-    const isQc = source === 'quick' || source === 'medical';
-    if (!isQc && source !== 'food') throw new ValidationError(`Unknown order type: ${source}`);
-    const order = await (isQc ? QcOrder : FoodOrder).findById(id).select('orderStatus').lean();
+    if (source !== 'food') throw new ValidationError(`Unknown order type: ${source}`);
+    const order = await FoodOrder.findById(id).select('orderStatus').lean();
     if (!order) return null;
     if (ORDER_IN_PROGRESS.includes(String(order.orderStatus))) {
         throw new ValidationError('This order is still in progress. Cancel it first, then delete it.');
     }
-    const service = isQc
-        ? await import('../../modules/quickCommerce/modules/food/orders/services/order.service.js')
-        : await import('../../modules/food/orders/services/order.service.js');
+    const service = await import('../../modules/food/orders/services/order.service.js');
     await service.deleteOrderAdmin(String(id), adminId);
     return { id: String(id), deleted: true };
 }
@@ -211,11 +201,9 @@ export async function listMasterOrders(query = {}) {
     const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 25));
     const search = query.search;
 
-    const { FoodOrder, QcOrder, Ride } = await models();
+    const { FoodOrder, Ride } = await models();
     const sources = {
         food: { model: FoodOrder },
-        quick: { model: QcOrder },
-        medical: { model: QcOrder },
         taxi: { model: Ride },
         parcel: { model: Ride },
     };
@@ -242,26 +230,17 @@ export async function listMasterOrders(query = {}) {
     // Names for just this page.
     const pick = (keys, field) => merged.filter((m) => keys.includes(m.key)).map((m) => m.row[field]);
     const foodRows = merged.filter((m) => m.key === 'food');
-    const qcRows = merged.filter((m) => m.key === 'quick' || m.key === 'medical');
-    const [foodUsers, qcUsers, foodStores, qcStores, foodRiders, qcRiders, taxiUsers, drivers] = await Promise.all([
+    const [foodUsers, foodStores, foodRiders, taxiUsers, drivers] = await Promise.all([
         byIds('users', foodRows.map((m) => m.row.userId), { name: 1, phone: 1 }),
-        byIds('qc_users', qcRows.map((m) => m.row.userId), { name: 1, phone: 1 }),
         byIds('food_restaurants', foodRows.map((m) => m.row.restaurantId), { restaurantName: 1 }),
-        byIds('qc_restaurants', qcRows.map((m) => m.row.restaurantId), { restaurantName: 1 }),
         byIds('food_delivery_partners', foodRows.map((m) => m.row.dispatch?.deliveryPartnerId), { name: 1, phone: 1 }),
-        byIds('qc_delivery_partners', qcRows.map((m) => m.row.dispatch?.deliveryPartnerId), { name: 1, phone: 1 }),
         byIds('users', pick(['taxi', 'parcel'], 'userId'), { name: 1, phone: 1 }),
         byIds('taxidrivers', pick(['taxi', 'parcel'], 'driverId'), { name: 1, phone: 1 }),
     ]);
 
     const orders = merged.map(({ key, row }) => {
         if (key === 'taxi' || key === 'parcel') return rideRow(row, { taxiUsers, drivers });
-        const food = key === 'food';
-        return orderRow(row, key, {
-            users: food ? foodUsers : qcUsers,
-            stores: food ? foodStores : qcStores,
-            riders: food ? foodRiders : qcRiders,
-        });
+        return orderRow(row, key, { users: foodUsers, stores: foodStores, riders: foodRiders });
     });
 
     const counts = Object.fromEntries(Object.entries(bySource).map(([k, v]) => [k, v.total]));

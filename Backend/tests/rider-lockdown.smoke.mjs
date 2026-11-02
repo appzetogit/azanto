@@ -12,6 +12,7 @@
  *   - taxi phone-only login and the fixed driver code are gone.
  */
 import express from 'express';
+import mongoose from 'mongoose';
 import { startFoodWorld, makeChecker, thrownBy } from './food-order-fixture.mjs';
 
 const w = await startFoodWorld('rider_lockdown');
@@ -78,14 +79,13 @@ try {
     const after = await hit('/v1/food/delivery/orders/available');
     check('rejected: refused on the next request', after.status === 403, after.status);
 
-    const qcToken = signAccessToken({ userId: String(other._id), role: 'DELIVERY_PARTNER' });
-    const { FoodDeliveryPartner: QCPartner } = await import('../src/modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js');
-    const qcRider = await QCPartner.create({ name: 'QC', phone: '9000000066', status: 'approved' });
+    // A rider left in the removed quick-commerce pool is not an account any more.
+    const qcRiderId = new mongoose.Types.ObjectId();
+    await mongoose.connection.db.collection('qc_delivery_partners').insertOne({ _id: qcRiderId, name: 'QC', phone: '9000000066', status: 'approved' });
     const qcHit = await fetch(`${base}/v1/food/delivery/orders/available`, {
-        headers: { Authorization: `Bearer ${signAccessToken({ userId: String(qcRider._id), role: 'DELIVERY_PARTNER' })}` },
+        headers: { Authorization: `Bearer ${signAccessToken({ userId: String(qcRiderId), role: 'DELIVERY_PARTNER' })}` },
     });
-    check('a quick-commerce rider cannot use food rider routes', qcHit.status === 403, qcHit.status);
-    void qcToken;
+    check('a quick-commerce rider id is refused on food rider routes', qcHit.status === 401, qcHit.status);
 
     console.log('\ntaxi sign-in');
     const otpLogin = await fetch(`${base}/v1/taxi/users/otp-login`, {

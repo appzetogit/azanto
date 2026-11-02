@@ -17,35 +17,18 @@ import { handleQrCodeCredited } from '../qrCreditWebhook.js';
 /**
  * Which vertical's order collection this provider event belongs to.
  *
- * There is ONE Razorpay account and one webhook secret, but the platform kept TWO
- * handlers -- master's, reading food_orders, and the quick-commerce fork's, reading
- * qc_orders. Razorpay accepts one URL per event, so whichever handler was not
- * configured simply never ran, and that vertical's orders reconciled only when the
- * customer's app happened to call /verify. Close the app after paying and the money
- * was stranded.
- *
- * So the handler resolves the collection instead of assuming it. Food is tried first
- * because it is the larger table and the common case; a miss costs one indexed
- * lookup. Returning the MODEL rather than a name keeps every query below identical
- * for both verticals -- the alternative is a branch per query, which is how the two
- * handlers drifted apart in the first place.
+ * There is ONE Razorpay account and one webhook secret, so one handler serves every
+ * vertical with store orders, and it resolves the collection instead of assuming it.
+ * Food is the only one now (quick commerce and its qc_orders were removed). Returning
+ * the MODEL rather than a name keeps every query below identical for any vertical
+ * added back -- the alternative is a branch per query, which is how two handlers
+ * once drifted apart.
  */
 const ORDER_SOURCES = [
     {
         vertical: 'food',
         load: async () => (await import('../../../modules/food/orders/models/order.model.js')).FoodOrder,
         ledger: async () => import('../../../modules/food/orders/services/foodTransaction.service.js'),
-    },
-    {
-        vertical: 'quickCommerce',
-        load: async () => (await import('../../../modules/quickCommerce/modules/food/orders/models/order.model.js')).FoodOrder,
-        /*
-         * Quick commerce keeps its own transaction service over its own
-         * qc_transactions collection. Using food's here would look up a QC order id
-         * in food_transactions, find nothing, and report success -- the ledger row
-         * for a captured payment would silently never be written.
-         */
-        ledger: async () => import('../../../modules/quickCommerce/modules/food/orders/services/foodTransaction.service.js'),
     },
 ];
 
@@ -163,9 +146,7 @@ export const handleRazorpayWebhook = async (req, res) => {
                 }
                 if (dead) {
                     try {
-                        const helper = vertical === 'quickCommerce'
-                            ? await import('../../../modules/quickCommerce/modules/food/orders/helpers/razorpay.helper.js')
-                            : await import('../../../modules/food/orders/helpers/razorpay.helper.js');
+                        const helper = await import('../../../modules/food/orders/helpers/razorpay.helper.js');
                         const amount = Number(paymentObj.amount || 0) / 100;
                         const refund = await helper.initiateRazorpayRefund(rzPaymentId, amount);
                         logger.warn(`Webhook [payment.captured]: late capture ${rzPaymentId} on ${status} order ${existingOrder._id} -- refunded (${refund?.refundId || 'no id'})`);

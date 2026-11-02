@@ -4,14 +4,16 @@
  * Run: node tests/coupon-list.smoke.mjs
  *
  * What this guards:
- *   - Food, Quick & Medical and Taxi coupons appear together with a readable
+ *   - Food and Taxi coupons appear together with a readable
  *     discount, where they apply, and how far they have been used;
  *   - each coupon's state (live, scheduled, paused, used up, expired) is right,
  *     including a limit tightened by the Master promo ceiling;
  *   - pausing writes what each checkout reads (status 'paused' / active:false)
  *     and resuming undoes it; an expired coupon is not resumed;
  *   - permissions: each admin sees only services with Offers access, and
- *     view-only cannot pause.
+ *     view-only cannot pause;
+ *   - quick commerce is gone: its old qc_offers are not listed and cannot be
+ *     paused.
  */
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
@@ -38,7 +40,6 @@ await mongoose.connect(process.env.MONGO_URI);
 const coupons = await import('../src/core/promotions/couponList.service.js');
 const resolver = await import('../src/core/config/resolver.service.js');
 const { FoodOffer } = await import('../src/modules/food/admin/models/offer.model.js');
-const { FoodOffer: QuickOffer } = await import('../src/modules/quickCommerce/modules/food/admin/models/offer.model.js');
 const { PromoCode } = await import('../src/modules/taxi/admin/promotions/models/PromoCode.js');
 
 const day = 24 * 60 * 60 * 1000;
@@ -47,21 +48,17 @@ const future = new Date(Date.now() + 10 * day);
 const oid = () => new mongoose.Types.ObjectId();
 
 const joy = oid();
-const storeA = oid();
-const storeB = oid();
 await mongoose.connection.collection('food_restaurants').insertOne({ _id: joy, restaurantName: 'Joy' });
-await mongoose.connection.collection('qc_restaurants').insertMany([
-  { _id: storeA, restaurantName: 'Sharma Medical' },
-  { _id: storeB, restaurantName: 'Daily Needs' },
-]);
+// Left behind by the removed quick-commerce vertical.
+const strayQuick = oid();
+await mongoose.connection.collection('qc_offers').insertOne({ _id: strayQuick, couponCode: 'QUICK5', discountType: 'percentage', discountValue: 5, status: 'active', createdAt: new Date() });
 
 const f = {};
 f.live = await FoodOffer.create({ couponCode: 'WELCOME50', discountType: 'flat-price', discountValue: 50, minOrderValue: 199, status: 'active', startDate: past, endDate: future, usedCount: 3, usageLimit: 100, createdAt: new Date(Date.now() - 5000) });
 f.joy = await FoodOffer.create({ couponCode: 'JOY20', discountType: 'percentage', discountValue: 20, maxDiscount: 80, restaurantScope: 'selected', restaurantId: joy, customerScope: 'first-time', status: 'active', createdByRole: 'RESTAURANT', createdAt: new Date(Date.now() - 4000) });
 f.expired = await FoodOffer.create({ couponCode: 'OLD10', discountType: 'percentage', discountValue: 10, status: 'inactive', startDate: new Date(Date.now() - 30 * day), endDate: past, createdAt: new Date(Date.now() - 3000) });
-const q = {};
-q.scheduled = await QuickOffer.create({ couponCode: 'MEDS15', discountType: 'percentage', discountValue: 15, restaurantScope: 'selected', restaurantIds: [storeA, storeB], status: 'active', startDate: future, createdAt: new Date(Date.now() - 2000) });
-q.usedUp = await QuickOffer.create({ couponCode: 'FIRST100', discountType: 'flat-price', discountValue: 100, status: 'active', usedCount: 10, usageLimit: 10, createdAt: new Date(Date.now() - 1000) });
+f.scheduled = await FoodOffer.create({ couponCode: 'MEDS15', discountType: 'percentage', discountValue: 15, status: 'active', startDate: future, createdAt: new Date(Date.now() - 2000) });
+f.usedUp = await FoodOffer.create({ couponCode: 'FIRST100', discountType: 'flat-price', discountValue: 100, status: 'active', usedCount: 10, usageLimit: 10, createdAt: new Date(Date.now() - 1000) });
 const t = await PromoCode.create({
   service_location_id: oid(), service_location_names: ['Palampur'], code: 'RIDE25', discount_percentage: 25,
   maximum_discount_amount: 60, from_date: past, to_date: future, uses_per_user: 2, max_uses_total: 0,
@@ -78,10 +75,11 @@ const byCode = async (admin = owner, query = {}) =>
 
 console.log('\nThe list');
 
-await check('all three services in one list', async () => {
+await check('both services in one list, and nothing from quick commerce', async () => {
   const res = await coupons.listCoupons(owner, {});
   assert.equal(res.total, 6);
-  assert.deepEqual(res.sources.map((s) => s.key), ['food', 'quick', 'taxi']);
+  assert.deepEqual(res.sources.map((s) => s.key), ['food', 'taxi']);
+  assert.ok(!res.items.some((r) => r.code === 'QUICK5'));
 });
 
 await check('each coupon reads plainly', async () => {
@@ -93,7 +91,6 @@ await check('each coupon reads plainly', async () => {
   assert.equal(c.JOY20.where, 'Joy');
   assert.equal(c.JOY20.audience, 'First order only');
   assert.equal(c.JOY20.createdBy, 'restaurant');
-  assert.equal(c.MEDS15.where, '2 stores');
   assert.equal(c.RIDE25.discount, '25% off up to ₹60');
   assert.equal(c.RIDE25.where, 'Palampur · taxi');
   assert.equal(c.RIDE25.audience, 'New users');
@@ -142,11 +139,15 @@ await check('pausing a Food coupon writes what checkout reads', async () => {
   assert.equal((await FoodOffer.findById(f.live._id).lean()).status, 'active');
 });
 
-await check('pausing a Quick coupon, and resuming it', async () => {
-  await coupons.setCouponLive(owner, 'quick', String(q.scheduled._id), false);
-  assert.equal((await QuickOffer.findById(q.scheduled._id).lean()).status, 'paused');
-  const row = await coupons.setCouponLive(owner, 'quick', String(q.scheduled._id), true);
+await check('pausing a scheduled coupon, and resuming it', async () => {
+  await coupons.setCouponLive(owner, 'food', String(f.scheduled._id), false);
+  assert.equal((await FoodOffer.findById(f.scheduled._id).lean()).status, 'paused');
+  const row = await coupons.setCouponLive(owner, 'food', String(f.scheduled._id), true);
   assert.equal(row.state, 'scheduled');
+});
+
+await check('a quick-commerce coupon cannot be paused any more', async () => {
+  await assert.rejects(() => coupons.setCouponLive(owner, 'quick', String(strayQuick), false), /Unknown coupon source/);
 });
 
 await check('Taxi pauses through its own toggle, and asking twice changes nothing', async () => {

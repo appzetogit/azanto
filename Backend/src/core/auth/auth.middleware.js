@@ -18,10 +18,9 @@ export const requireAdmin = (req, res, next) => {
  *
  * A rider must be approved. A store must exist and not be rejected (a store
  * sent back to review after a bank change keeps its panel, but not new orders).
- * The id is looked up in food first, then quick commerce, and the answer is
- * attached as req.user.vertical so food-only routes can refuse the other one
- * (see requireFoodDeliveryPartner). Cached for 15s per id: these run on every
- * location ping.
+ * The id is looked up in food, and the answer is attached as req.user.vertical
+ * (see requireFoodDeliveryPartner). An id food does not know is refused.
+ * Cached for 15s per id: these run on every location ping.
  */
 const ACCOUNT_TTL_MS = 15_000;
 const accountCache = new Map();
@@ -38,20 +37,10 @@ async function lookupAccount(role, id) {
         const { FoodDeliveryPartner } = await import('../../modules/food/delivery/models/deliveryPartner.model.js');
         const food = await FoodDeliveryPartner.findById(id).select('status').lean();
         if (food) value = { vertical: 'food', status: food.status };
-        else {
-            const { FoodDeliveryPartner: QCPartner } = await import('../../modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js');
-            const qc = await QCPartner.findById(id).select('status').lean();
-            if (qc) value = { vertical: 'quickCommerce', status: qc.status };
-        }
     } else if (role === 'RESTAURANT') {
         const { FoodRestaurant } = await import('../../modules/food/restaurant/models/restaurant.model.js');
         const food = await FoodRestaurant.findById(id).select('status').lean();
         if (food) value = { vertical: 'food', status: food.status };
-        else {
-            const { FoodRestaurant: QCStore } = await import('../../modules/quickCommerce/modules/food/restaurant/models/restaurant.model.js');
-            const qc = await QCStore.findById(id).select('status').lean();
-            if (qc) value = { vertical: 'quickCommerce', status: qc.status };
-        }
     }
     accountCache.set(key, { at: Date.now(), value });
     return value;

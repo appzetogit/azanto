@@ -1,5 +1,5 @@
 /**
- * Master menu: one customer list, one Food/Quick/Medical rider list, true counts.
+ * Master menu: one customer list, one rider list, true counts.
  *
  * Run: node tests/master-people-merge.smoke.mjs
  */
@@ -18,7 +18,7 @@ const check = async (label, fn) => {
 const db = mongoose.connection.db;
 const oid = () => new mongoose.Types.ObjectId();
 const { setCustomerBlocked, listGlobalUsers } = await import('../src/core/users/globalUsers.service.js');
-const { FoodRefreshToken, QCRefreshToken } = await import('../src/core/refreshTokens/refreshToken.model.js');
+const { FoodRefreshToken } = await import('../src/core/refreshTokens/refreshToken.model.js');
 const admin = await import('../src/modules/food/admin/services/admin.service.js');
 
 const asha = oid(); const gone = oid(); const ashaQc = oid();
@@ -26,31 +26,31 @@ await db.collection('users').insertMany([
   { _id: asha, name: 'Asha', phone: '9000000001', isActive: true, createdAt: new Date() },
   { _id: gone, name: 'Gone', phone: '9000000002', isActive: true, deletedAt: new Date(), createdAt: new Date() },
 ]);
+// Left behind by the removed quick-commerce vertical.
 await db.collection('qc_users').insertOne({ _id: ashaQc, phone: '+919000000001', isActive: true });
 await FoodRefreshToken.collection.insertOne({ userId: asha, token: 'f', expiresAt: new Date(Date.now() + 1e9) });
-await QCRefreshToken.collection.insertOne({ userId: ashaQc, token: 'q', expiresAt: new Date(Date.now() + 1e9) });
 
 await check('All Customers leaves deleted accounts out', async () => {
   const r = await listGlobalUsers({});
   assert.deepEqual(r.users.map((u) => u.name), ['Asha']);
 });
 
-await check('block reaches Food, Taxi and Quick, and signs the customer out', async () => {
+await check('block reaches Food and Taxi, and signs the customer out', async () => {
   const r = await setCustomerBlocked(String(asha), true);
   assert.equal(r.isActive, false);
   const u = await db.collection('users').findOne({ _id: asha });
   assert.equal(u.isActive, false);
   assert.equal(u.active, false);
-  assert.equal((await db.collection('qc_users').findOne({ _id: ashaQc })).isActive, false);
   assert.equal(await FoodRefreshToken.countDocuments({ userId: asha }), 0);
-  assert.equal(await QCRefreshToken.countDocuments({ userId: ashaQc }), 0);
+  assert.equal((await db.collection('qc_users').findOne({ _id: ashaQc })).isActive, true, 'old quick-commerce row left alone');
   assert.equal(u.name, 'Asha'); // nothing else touched
 });
 
 await check('unblock restores every app', async () => {
   await setCustomerBlocked(String(asha), false);
-  assert.equal((await db.collection('users').findOne({ _id: asha })).active, true);
-  assert.equal((await db.collection('qc_users').findOne({ _id: ashaQc })).isActive, true);
+  const u = await db.collection('users').findOne({ _id: asha });
+  assert.equal(u.active, true);
+  assert.equal(u.isActive, true);
 });
 
 await check('a deleted or unknown customer is not found', async () => {
@@ -59,14 +59,14 @@ await check('a deleted or unknown customer is not found', async () => {
 });
 
 const { FoodDeliveryPartner } = await import('../src/modules/food/delivery/models/deliveryPartner.model.js');
-const { FoodDeliveryPartner: QcRider } = await import('../src/modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js');
 const rider = await FoodDeliveryPartner.collection.insertOne({ name: 'Rishi', phone: '9100000001', status: 'approved', createdAt: new Date() });
 await FoodDeliveryPartner.collection.insertOne({ name: 'New', phone: '9100000002', status: 'pending', createdAt: new Date() });
-await QcRider.collection.insertOne({ name: 'Rishi', phone: '9100000001', status: 'approved' });
 
-await check('deleting a rider also takes their Quick copy off the Quick list', async () => {
+await check('deleting a rider takes them off the rider list', async () => {
   await admin.deactivateDeliveryPartner(String(rider.insertedId));
-  assert.equal((await QcRider.findOne({ phone: '9100000001' }).lean()).status, 'deactivated');
+  const r = await FoodDeliveryPartner.findById(rider.insertedId).lean();
+  assert.equal(r.status, 'deactivated');
+  assert.equal(r.availabilityStatus, 'offline');
 });
 
 await db.collection('taxidrivers').insertMany([

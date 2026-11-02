@@ -8,11 +8,10 @@
  * FOD-0243696 was charged Rs 348 (Rs 347.80 rounded up) and its ledger accounted
  * for Rs 347.80, leaving 20 paise credited to nobody -- on every order, since
  * almost every bill rounds. The payout audit let up to 51 paise through as
- * "expected". Quick commerce booked the 18% GST on its delivery fee as platform
- * profit, when that money is owed to the government.
+ * "expected".
  *
- * Drives the real createInitialTransaction of both verticals against an
- * in-memory Mongo, on bills built by the real computeBill.
+ * Drives the real food createInitialTransaction against an in-memory Mongo, on
+ * bills built by the real computeBill.
  */
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
@@ -39,7 +38,6 @@ const main = async () => {
     const { FoodRestaurantCommission } = await import('../src/modules/food/admin/models/restaurantCommission.model.js');
     const { FoodOffer } = await import('../src/modules/food/admin/models/offer.model.js');
     const food = await import('../src/modules/food/orders/services/foodTransaction.service.js');
-    const qc = await import('../src/modules/quickCommerce/modules/food/orders/services/foodTransaction.service.js');
 
     const restaurantId = id();
     await FoodRestaurantCommission.create({ restaurantId, defaultCommission: { type: 'percentage', value: 12 }, status: true });
@@ -104,24 +102,6 @@ const main = async () => {
     const loss = await foodOrder('free delivery the platform pays for', { items: 60, delivery: 0, riderPay: 49 });
     check('  a loss is recorded as a loss, not floored at zero', () => {
         assert.ok(loss.a.platformNetProfit < 0, `platform ${loss.a.platformNetProfit}`);
-    });
-
-    // --------------------------------------------------------- quick commerce
-    console.log('\nquick commerce');
-    const qcOrder = {
-        _id: id(), userId: id(), restaurantId: id(),
-        payment: { method: 'cash', status: 'cod_pending', amountDue: 250.4 },
-        riderEarning: 30,
-        pricing: { subtotal: 200, tax: 10, packagingFee: 0, deliveryFee: 30, deliveryFeeGst: 5.4, platformFee: 5, discount: 0, total: 250.4 },
-    };
-    const qt = await qc.createInitialTransaction(qcOrder);
-    check('delivery-fee GST is booked as tax, not platform profit', () => {
-        assert.equal(qt.amounts.taxAmount, 15.4, `tax ${qt.amounts.taxAmount}`);
-        assert.equal(qt.amounts.platformNetProfit, 5, `platform ${qt.amounts.platformNetProfit}`);
-    });
-    check('Rs 250.40 paid, every rupee credited', () => {
-        const accounted = r2(qt.amounts.restaurantShare + qt.amounts.riderShare + qt.amounts.platformNetProfit + qt.amounts.taxAmount);
-        assert.equal(accounted, 250.4, `accounted ${accounted}`);
     });
 
     await mongoose.disconnect();

@@ -3,18 +3,18 @@ import { logger } from '../../utils/logger.js';
 /**
  * What a referral pays, set once in Master > Referral.
  *
- * Three systems grew separately: Food (food_referral_settings), Quick & Medical
- * (qc_referral_settingses) and Taxi (the referral block of its business
- * settings). Each still decides WHEN it pays -- Food and Quick at sign-up or
- * rider approval, Taxi after the completed rides its own screen asks for -- but
- * HOW MUCH now comes from here when an admin has set it (globally, or for one
- * service), so "a referral pays Rs 50" is one number instead of three.
+ * Two systems grew separately: Food (food_referral_settings) and Taxi (the
+ * referral block of its business settings). Each still decides WHEN it pays --
+ * Food at sign-up or rider approval, Taxi after the completed rides its own
+ * screen asks for -- but HOW MUCH now comes from here when an admin has set it
+ * (globally, or for one service), so "a referral pays Rs 50" is one number
+ * instead of two.
  *
  * Unset keeps each service's own value. That is deliberate: this reaches the
  * code paths that credit wallets, and a new screen must not change what anyone
  * is paid until somebody saves something on it.
  *
- * Verticals: 'food', 'quickCommerce' (which Medical runs on) and 'taxi'.
+ * Verticals: 'food' and 'taxi'.
  */
 
 const KEYS = {
@@ -24,7 +24,7 @@ const KEYS = {
   partnerLimit: 'referral.partnerLimit',
 };
 
-export const REFERRAL_VERTICALS = ['food', 'quickCommerce', 'taxi'];
+export const REFERRAL_VERTICALS = ['food', 'taxi'];
 
 const NONE = Object.freeze({ customerReward: null, customerLimit: null, partnerReward: null, partnerLimit: null });
 
@@ -59,14 +59,14 @@ export async function resolveMasterReferral(vertical) {
 const anySet = (m) => Object.values(m).some((v) => v !== null);
 
 /**
- * Food's or Quick's referral settings document, with Master's values in place.
+ * Food's referral settings document, with Master's values in place.
  *
  * Returns the same shape every existing caller reads (referralRewardUser,
  * referralLimitUser, referralRewardDelivery, referralLimitDelivery, plus the
  * link templates), so a call site changes only where the document comes from.
  * Null only when neither the service nor Master has anything -- as before.
  *
- * @param {'food'|'quickCommerce'} vertical
+ * @param {'food'} vertical
  * @param {import('mongoose').Model} Model  that service's referral settings model
  */
 export async function referralSettingsFor(vertical, Model) {
@@ -107,9 +107,8 @@ export async function taxiReferralFor(kind, own = {}) {
  * Master screen: "Food pays Rs 50 (its own setting)" vs "(Master)".
  */
 export async function referralOverview() {
-  const [{ FoodReferralSettings }, { FoodReferralSettings: QuickReferralSettings }, { AdminBusinessSetting }] = await Promise.all([
+  const [{ FoodReferralSettings }, { AdminBusinessSetting }] = await Promise.all([
     import('../../modules/food/admin/models/referralSettings.model.js'),
-    import('../../modules/quickCommerce/modules/food/admin/models/referralSettings.model.js'),
     import('../../modules/taxi/admin/models/AdminBusinessSetting.js'),
   ]);
 
@@ -154,7 +153,6 @@ export async function referralOverview() {
   return {
     services: await Promise.all([
       storeRow('food', FoodReferralSettings),
-      storeRow('quickCommerce', QuickReferralSettings),
       taxiRow(),
     ]),
   };

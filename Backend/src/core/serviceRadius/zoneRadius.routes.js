@@ -20,7 +20,7 @@ const verticalOf = (v) => (ZONE_RADIUS_VERTICALS.includes(String(v)) ? String(v)
 
 router.get('/', async (req, res) => {
     const vertical = verticalOf(req.query.vertical || 'food');
-    if (!vertical) return sendError(res, 400, 'Choose Food, Quick or Medical');
+    if (!vertical) return sendError(res, 400, 'Unknown service');
     try {
         return sendResponse(res, 200, 'OK', { vertical, zones: await listZoneRadii(vertical) });
     } catch (err) {
@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 
 router.put('/:vertical/:zoneId', async (req, res) => {
     const vertical = verticalOf(req.params.vertical);
-    if (!vertical) return sendError(res, 400, 'Choose Food, Quick or Medical');
+    if (!vertical) return sendError(res, 400, 'Unknown service');
     try {
         const data = await setZoneRadius(vertical, req.params.zoneId, req.body?.radiusKm, { actor: 'admin' });
         return sendResponse(res, 200, 'Delivery radius saved', data);

@@ -24,15 +24,6 @@ import { AdminAudit } from './models/adminAudit.model.js';
  * Fails CLOSED on an infrastructure error (admin lookup throws) but only while
  * enforcing -- in tolerant mode an outage in this middleware must not take the
  * withdrawal queue down with it.
- *
- * KNOWN GAP, to close before FINANCE_PERMISSIONS_ENFORCED is switched on: this
- * reads master's `admins` collection, and quick-commerce has its own admins in
- * `qc_admins` with an incompatible permissions shape (a nested object rather than
- * a flat array). A QC-native admin is therefore absent here. Tolerant mode records
- * them as a violation and lets them through, which is correct for now -- but
- * enforcing would refuse them, and QC's own admins would lose their money routes.
- * The admin identities must merge first. See
- * modules/quickCommerce/core/roles/adminPermission.middleware.js.
  */
 
 const resolveActorId = (req) =>

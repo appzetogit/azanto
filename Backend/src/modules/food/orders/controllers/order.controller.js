@@ -2,50 +2,6 @@ import { sendResponse } from '../../../../utils/response.js';
 import * as orderService from '../services/order.service.js';
 import * as foodOrderPaymentService from '../services/foodOrderPayment.service.js';
 
-/*
- * Quick & Medical orders through the Food rider endpoints.
- *
- * The delivery app signs in, goes online and acts only through these Food
- * endpoints. When the order id is a Quick / Medical order, the call is handed
- * to the Quick order service as the rider's linked Quick rider record
- * (core/delivery/qcRiderLink.js). Returns undefined for a Food order, so the
- * Food path runs unchanged.
- */
-/**
- * A Quick order names the rider by their Quick rider id (offeredTo,
- * deliveryPartnerId). The app only knows its Food rider id and skips orders
- * that are not offered to it, so hand them over with the Food id in place.
- */
-const asFoodRider = (value, qcRiderId, foodRiderId) => {
-    if (value == null || !qcRiderId || !foodRiderId) return value;
-    return JSON.parse(JSON.stringify(value).split(String(qcRiderId)).join(String(foodRiderId)));
-};
-
-const viaQuickOrder = async (req, run) => {
-    const orderId = req.params?.orderId;
-    if (!orderId) return undefined;
-    const link = await import('../../../../core/delivery/qcRiderLink.js');
-    if (!(await link.isQcOrderId(orderId))) return undefined;
-    const qcRiderId = await link.qcRiderIdForFoodRider(req.user?.userId);
-    if (!qcRiderId) return undefined;
-    const qcService = await import('../../../quickCommerce/modules/food/orders/services/order.service.js');
-    const qcDelivery = await import('../../../quickCommerce/modules/food/orders/services/order-delivery.service.js');
-    return { result: asFoodRider(await run({ ...qcService, ...qcDelivery }, qcRiderId, orderId), qcRiderId, req.user?.userId) };
-};
-
-/** The rider's Quick / Medical orders, for merging into the Food lists. */
-const quickOrdersForRider = async (req, run) => {
-    try {
-        const { qcRiderIdForFoodRider } = await import('../../../../core/delivery/qcRiderLink.js');
-        const qcRiderId = await qcRiderIdForFoodRider(req.user?.userId);
-        if (!qcRiderId) return null;
-        const qcService = await import('../../../quickCommerce/modules/food/orders/services/order.service.js');
-        return asFoodRider(await run(qcService, qcRiderId), qcRiderId, req.user?.userId);
-    } catch {
-        return null;
-    }
-};
-
 import {
     validateCalculateOrderDto,
     validateCreateOrderDto,
@@ -162,10 +118,6 @@ export async function rateCustomerDeliveryController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;
         const dto = validateCustomerRatingDto(req.body);
-        // Quick & Medical keep no rider-to-customer rating: accept it so the
-        // app's last screen finishes, and record nothing.
-        const qc = await viaQuickOrder(req, async () => ({ recorded: false }));
-        if (qc) return sendResponse(res, 200, 'Customer rated successfully', qc.result);
         const result = await orderService.submitCustomerRating(
             req.params.orderId,
             deliveryPartnerId,
@@ -268,12 +220,6 @@ export async function listOrdersAvailableDeliveryController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;
         const result = await orderService.listOrdersAvailableDelivery(deliveryPartnerId, req.query);
-        // Quick & Medical orders offered to this rider, in the same list.
-        const quick = await quickOrdersForRider(req, (svc, rider) => svc.listOrdersAvailableDelivery(rider, req.query));
-        if (quick?.data?.length) {
-            result.data = [...(result.data || []), ...quick.data];
-            if (result.meta) result.meta.total = Number(result.meta.total || 0) + Number(quick.meta?.total || quick.data.length);
-        }
         return sendResponse(res, 200, 'Orders retrieved', result);
     } catch (err) {
         next(err);
@@ -282,8 +228,6 @@ export async function listOrdersAvailableDeliveryController(req, res, next) {
 
 export async function acceptOrderDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.acceptOrderDelivery(id, rider));
-        if (qc) return sendResponse(res, 200, 'Order accepted', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.acceptOrderDelivery(orderId, deliveryPartnerId);
@@ -297,8 +241,6 @@ export async function rejectOrderDeliveryController(req, res, next) {
     try {
         // Optional: shown to the admins when the rider declines an order they assigned.
         const reason = typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 200) : '';
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.rejectOrderDelivery(id, rider, { reason }));
-        if (qc) return sendResponse(res, 200, 'Order rejected', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.rejectOrderDelivery(orderId, deliveryPartnerId, { reason });
@@ -310,8 +252,6 @@ export async function rejectOrderDeliveryController(req, res, next) {
 
 export async function confirmReachedPickupDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.confirmReachedPickupDelivery(id, rider));
-        if (qc) return sendResponse(res, 200, 'Reached pickup confirmed', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.confirmReachedPickupDelivery(orderId, deliveryPartnerId);
@@ -323,8 +263,6 @@ export async function confirmReachedPickupDeliveryController(req, res, next) {
 
 export async function confirmPickupDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.confirmPickupDelivery(id, rider, req.body?.billImageUrl));
-        if (qc) return sendResponse(res, 200, 'Pickup confirmed', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const { billImageUrl } = req.body;
@@ -338,29 +276,19 @@ export async function confirmPickupDeliveryController(req, res, next) {
 /**
  * The pharmacy / restaurant bill, photographed by the rider at pickup.
  * Body: { base64, mimeType? }. Returns { url } for confirm-pickup's billImageUrl.
- * Only the rider carrying the order (Food, or Quick & Medical as the linked
- * rider) may upload, only images, at most 8MB.
+ * Only the rider carrying the order may upload, only images, at most 8MB.
  */
 export async function uploadPickupBillPhotoController(req, res, next) {
     try {
         const riderId = String(req.user?.userId || '');
         const orderId = req.params.orderId;
-        const link = await import('../../../../core/delivery/qcRiderLink.js');
         const mongoose = (await import('mongoose')).default;
         const byId = mongoose.Types.ObjectId.isValid(orderId)
             ? { _id: new mongoose.Types.ObjectId(orderId) }
             : { $or: [{ order_id: orderId }, { orderId }] };
-        let assigned = null;
-        if (await link.isQcOrderId(orderId)) {
-            const { FoodOrder: QcOrder } = await import('../../../quickCommerce/modules/food/orders/models/order.model.js');
-            const qcRider = await link.qcRiderIdForFoodRider(riderId);
-            const row = await QcOrder.findOne(byId).select('dispatch.deliveryPartnerId').lean();
-            assigned = row && qcRider && String(row.dispatch?.deliveryPartnerId || '') === String(qcRider);
-        } else {
-            const { FoodOrder } = await import('../models/order.model.js');
-            const row = await FoodOrder.findOne(byId).select('dispatch.deliveryPartnerId').lean();
-            assigned = row && String(row.dispatch?.deliveryPartnerId || '') === riderId;
-        }
+        const { FoodOrder } = await import('../models/order.model.js');
+        const row = await FoodOrder.findOne(byId).select('dispatch.deliveryPartnerId').lean();
+        const assigned = row && String(row.dispatch?.deliveryPartnerId || '') === riderId;
         if (!assigned) return sendResponse(res, 403, 'Not your order', null);
 
         const base64 = String(req.body?.base64 || '').replace(/^data:[^,]*,/, '');
@@ -383,8 +311,6 @@ export async function uploadPickupBillPhotoController(req, res, next) {
 
 export async function confirmReachedDropDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.confirmReachedDropDelivery(id, rider));
-        if (qc) return sendResponse(res, 200, 'Reached drop confirmed', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.confirmReachedDropDelivery(orderId, deliveryPartnerId);
@@ -397,8 +323,6 @@ export async function confirmReachedDropDeliveryController(req, res, next) {
 /** GET /food/delivery/orders/:orderId/route — rider's own map. */
 export async function getOrderRouteDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.getOrderRouteForDelivery(id, rider, req.query || {}));
-        if (qc) return sendResponse(res, 200, 'Route', qc.result);
         const data = await orderService.getOrderRoute(req.params.orderId, {
             lat: req.query.lat,
             lng: req.query.lng,
@@ -423,8 +347,6 @@ export async function getOrderRouteUserController(req, res, next) {
 
 export async function verifyDropOtpDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.verifyDropOtpDelivery(id, rider, req.body?.otp));
-        if (qc) return sendResponse(res, 200, 'OTP verified', { order: qc.result?.order ?? qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const { otp } = req.body;
@@ -437,8 +359,6 @@ export async function verifyDropOtpDeliveryController(req, res, next) {
 
 export async function completeDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.completeDelivery(id, rider, req.body || {}));
-        if (qc) return sendResponse(res, 200, 'Delivery completed', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.completeDelivery(orderId, deliveryPartnerId, req.body || {});
@@ -453,8 +373,6 @@ export async function updateOrderStatusDeliveryController(req, res, next) {
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const dto = validateOrderStatusDto(req.body);
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.updateOrderStatusDelivery(id, rider, dto.orderStatus));
-        if (qc) return sendResponse(res, 200, 'Order status updated', { order: qc.result });
         const order = await orderService.updateOrderStatusDelivery(orderId, deliveryPartnerId, dto.orderStatus);
         return sendResponse(res, 200, 'Order status updated', { order });
     } catch (err) {
@@ -465,15 +383,12 @@ export async function updateOrderStatusDeliveryController(req, res, next) {
 export async function getCurrentTripDeliveryController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;
-        let order = await orderService.getCurrentTripDelivery(deliveryPartnerId);
-        // No Food trip: the rider may be on a Quick / Medical one.
-        if (!order) order = await quickOrdersForRider(req, (svc, rider) => svc.getCurrentTripDelivery(rider));
-        // Every order on the trip, Food and Quick/Medical, first accepted first.
-        // `activeOrder` stays for app builds that know only one.
+        const order = await orderService.getCurrentTripDelivery(deliveryPartnerId);
+        // Every order on the trip, first accepted first. `activeOrder` stays for
+        // app builds that know only one.
         const food = await orderService.getCurrentTripsDelivery(deliveryPartnerId).catch(() => []);
-        const quick = (await quickOrdersForRider(req, (svc, rider) => svc.getCurrentTripsDelivery(rider))) || [];
         const acceptedAt = (o) => new Date(o?.dispatch?.acceptedAt || o?.createdAt || 0).getTime();
-        const activeOrders = [...food, ...quick].sort((a, b) => acceptedAt(a) - acceptedAt(b));
+        const activeOrders = [...food].sort((a, b) => acceptedAt(a) - acceptedAt(b));
         return sendResponse(res, 200, 'Current trip retrieved', { activeOrder: order || null, activeOrders });
     } catch (err) {
         next(err);
@@ -485,8 +400,6 @@ export async function createCollectQrController(req, res, next) {
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const customerInfo = req.body || {};
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.createCollectQr(id, rider, customerInfo));
-        if (qc) return sendResponse(res, 200, 'QR created', qc.result);
         const result = await orderService.createCollectQr(orderId, deliveryPartnerId, customerInfo);
         return sendResponse(res, 200, 'QR created', result);
     } catch (err) {
@@ -496,8 +409,6 @@ export async function createCollectQrController(req, res, next) {
 
 export async function getOrderByIdDeliveryController(req, res, next) {
     try {
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.getOrderById(id, { deliveryPartnerId: rider }));
-        if (qc) return sendResponse(res, 200, 'Order retrieved', { order: qc.result });
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
         const order = await orderService.getOrderById(orderId, { deliveryPartnerId });
@@ -512,8 +423,6 @@ export async function getPaymentStatusController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.getPaymentStatus(id, rider));
-        if (qc) return sendResponse(res, 200, 'Payment status retrieved', qc.result);
         const result = await orderService.getPaymentStatus(orderId, deliveryPartnerId);
         return sendResponse(res, 200, 'Payment status retrieved', result);
     } catch (err) {
@@ -525,8 +434,6 @@ export async function switchToCashController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
-        const qc = await viaQuickOrder(req, (svc, rider, id) => svc.switchToCash(id, rider));
-        if (qc) return sendResponse(res, 200, 'Switched to cash collection', qc.result);
         const result = await orderService.switchToCash(orderId, deliveryPartnerId);
         return sendResponse(res, 200, 'Switched to cash collection', result);
     } catch (err) {

@@ -1,8 +1,7 @@
 /**
  * Seller web-portal login: email + password, then an OTP to the phone on file.
  *
- * Shared by restaurants (Food, `food_restaurants`) and by stores and medical
- * stores (quick commerce, `qc_restaurants`). Each caller hands in its own seller
+ * Used by restaurants (Food, `food_restaurants`). The caller hands in its seller
  * model and OTP scope and decides afterwards whether the proved seller may sign
  * in and how its session is issued.
  *

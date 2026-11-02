@@ -2215,8 +2215,8 @@ export async function updateRestaurantOfferStatus(restaurantId, offerId, status)
  * name and a null id in the admin panel, and a dining or gourmet showcase entry
  * keeps advertising a restaurant customers can no longer order from.
  *
- * Collection names rather than models, because these live across two verticals
- * and several modules; importing eight models into a delete path is how the
+ * Collection names rather than models, because these live across several
+ * modules; importing eight models into a delete path is how the
  * list falls out of date the first time someone adds a ninth.
  */
 const RESTAURANT_SCOPED_CONFIG = [
@@ -2229,9 +2229,6 @@ const RESTAURANT_SCOPED_CONFIG = [
     'food_gourmet_restaurants',
     'food_user_carts',
     'food_restaurant_withdrawal_settings',
-    // The quick-commerce twins, which mount the same restaurants.
-    'qc_items',
-    'qc_restaurant_outlet_timings',
 ];
 
 /**
@@ -2244,8 +2241,8 @@ const RESTAURANT_SCOPED_CONFIG = [
  * restaurantId that no longer resolves, and that is correct: it is a historical
  * fact about an entity that used to exist.
  *
- *   food_orders, qc_orders
- *   food_transactions, qc_transactions
+ *   food_orders
+ *   food_transactions
  *   food_price_adjustments
  */
 

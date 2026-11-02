@@ -1,6 +1,6 @@
 /**
- * Food and quick-commerce rider money projected into the master ledger, against a
- * real database, checked against riderFinance itself.
+ * Food rider money projected into the master ledger, against a real database,
+ * checked against riderFinance itself.
  * Isolated in-memory MongoDB replica set; never touches Atlas.
  *
  * Run:  node tests/ledger.projector.smoke.mjs
@@ -8,8 +8,8 @@
  * What must hold before the projector is run against production:
  *
  *   - dry run writes nothing
- *   - after a run, the ledger agrees with riderFinance to the paisa, for both
- *     verticals, balance AND cash
+ *   - after a run, the ledger agrees with riderFinance to the paisa, for every
+ *     rider, balance AND cash
  *   - a second run appends nothing
  *   - source state changing underneath -- delivery reversed, withdrawal rejected,
  *     earning edited, order reassigned, deposit completed -- converges on the next
@@ -47,9 +47,7 @@ async function main() {
   const { loadDeliveryModels, getRiderFinance } = await import('../src/core/finance/riderFinance.service.js');
   const projector = await import('../src/core/finance/deliveryLedgerProjector.js');
   const { FoodDeliveryPartner: FoodPartner } = await import('../src/modules/food/delivery/models/deliveryPartner.model.js');
-  const { FoodDeliveryPartner: QCPartner } = await import('../src/modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js');
   const food = await loadDeliveryModels('food');
-  const qc = await loadDeliveryModels('quickCommerce');
 
   let phone = 9400000000;
   const seed = async (Partner, m, rider) => {
@@ -81,9 +79,9 @@ async function main() {
   };
 
   const foodRider = oid();
-  const qcRider = oid();
+  const secondRider = oid();
   const foodRows = await seed(FoodPartner, food, foodRider);
-  const qcRows = await seed(QCPartner, qc, qcRider);
+  const secondRows = await seed(FoodPartner, food, secondRider);
 
   // --- first run ------------------------------------------------------------
   console.log('first run');
@@ -103,18 +101,22 @@ async function main() {
     assert.equal(r.ledger.cash, 440);
   });
 
-  await test('commit: the quick-commerce ledger agrees too, from the qc_* collections', async () => {
-    const totals = await projector.projectVertical({ vertical: 'quickCommerce', commit: true });
-    assert.equal(totals.partners, 1);
+  await test('commit for the whole vertical: every rider agrees', async () => {
+    const totals = await projector.projectVertical({ vertical: 'food', commit: true });
+    assert.equal(totals.partners, 2);
     assert.equal(totals.failed, 0);
-    await agree(qcRider, 'quickCommerce');
-    const qcEntries = await LedgerEntry.find({ ownerId: String(qcRider) }).lean();
-    assert.ok(qcEntries.every((e) => e.vertical === 'quickCommerce'));
+    await agree(secondRider, 'food');
+    const entries = await LedgerEntry.find({ ownerId: String(secondRider) }).lean();
+    assert.ok(entries.length > 0 && entries.every((e) => e.vertical === 'food'));
+  });
+
+  await test('quick commerce is no longer a delivery vertical', async () => {
+    await assert.rejects(() => loadDeliveryModels('quickCommerce'), /Unknown delivery vertical/);
   });
 
   await test('...and matches what the rider is actually shown', async () => {
-    const shown = await getRiderFinance(qcRider);
-    const r = await projector.reconcilePartner({ partnerId: qcRider, vertical: 'quickCommerce' });
+    const shown = await getRiderFinance(secondRider);
+    const r = await projector.reconcilePartner({ partnerId: secondRider, vertical: 'food' });
     assert.equal(r.ledger.balance, shown.breakdown.delivery.pocketBalanceRaw);
     assert.equal(r.ledger.cash, shown.breakdown.delivery.cashInHandRaw);
   });
@@ -173,13 +175,13 @@ async function main() {
   console.log('concurrency');
 
   await test('two runs racing over a change do not double-count', async () => {
-    await qc.Withdrawal.collection.updateOne({ _id: qcRows.withdrawals.approved }, { $set: { amount: 60 } });
-    await qc.Bonus.collection.insertOne({ _id: oid(), transactionId: 'BON-race', deliveryPartnerId: qcRider, amount: 7 });
+    await food.Withdrawal.collection.updateOne({ _id: secondRows.withdrawals.approved }, { $set: { amount: 60 } });
+    await food.Bonus.collection.insertOne({ _id: oid(), transactionId: 'BON-race', deliveryPartnerId: secondRider, amount: 7 });
     const runs = await Promise.all([1, 2, 3, 4].map(() =>
-      projector.projectPartner({ partnerId: qcRider, vertical: 'quickCommerce', commit: true })));
+      projector.projectPartner({ partnerId: secondRider, vertical: 'food', commit: true })));
     const appended = runs.reduce((s, r) => s + r.appended, 0);
     assert.equal(appended, 2, `expected exactly the 2 changes, got ${appended}`);
-    await agree(qcRider, 'quickCommerce');
+    await agree(secondRider, 'food');
   });
 
   await mongoose.disconnect();

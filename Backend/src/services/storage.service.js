@@ -3,14 +3,7 @@
  *
  * Food used to upload to Cloudinary. That account (`dx26sj1as`) is disabled:
  * every delivery URL returns 401 `cloud_name is disabled`, and so does every
- * new upload. quickCommerce had already moved to local disk; this is the same
- * implementation on the master side so food can follow.
- *
- * It mirrors modules/quickCommerce/services/storage.service.js rather than
- * importing it: master is the base and quickCommerce is a fork of it, so a
- * master -> fork import
- * import would invert that dependency. Leaf utilities are
- * already duplicated across that boundary throughout this repo.
+ * new upload, so food media is stored on local disk instead.
  *
  * Images are normalized to WebP on the way in (GIF passes through so animation
  * survives), which is why the stored extension rarely matches the uploaded one.

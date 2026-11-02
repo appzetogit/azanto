@@ -57,21 +57,20 @@ await check("the week's pocket includes the parcel as a trip and a payment", asy
   assert.equal(Math.round(pocket.summary.totalEarning * 100) / 100, 93.46);
 });
 
-await check('a Medical delivery is listed in history under the pharmacy name', async () => {
-  const link = await import('../src/core/delivery/qcRiderLink.js');
-  const qcId = await link.qcRiderIdForFoodRider(rider._id);
+await check('a row left in the removed qc_orders is in neither earnings nor history', async () => {
   const pharmacy = new mongoose.Types.ObjectId();
   await mongoose.connection.db.collection('qc_restaurants').insertOne({ _id: pharmacy, restaurantName: 'Quick Medical', storeType: 'pharmacy' });
-  const { FoodOrder: QcOrder } = await import('../src/modules/quickCommerce/modules/food/orders/models/order.model.js');
-  await QcOrder.collection.insertOne({
+  await mongoose.connection.db.collection('qc_orders').insertOne({
     order_id: 'MED-1000000009', orderStatus: 'delivered', riderEarning: 30, restaurantId: pharmacy,
-    dispatch: { status: 'accepted', deliveryPartnerId: new mongoose.Types.ObjectId(qcId) },
+    dispatch: { status: 'accepted', deliveryPartnerId: rider._id },
     deliveryState: { deliveredAt: new Date() }, createdAt: new Date(),
   });
   const { trips } = await svc.getDeliveryPartnerTripHistory(String(rider._id), { period: 'daily', status: 'Completed' });
-  assert.ok(trips.some((t) => t.restaurantName === 'Quick Medical'), JSON.stringify(trips.map((t) => t.restaurantName)));
+  assert.ok(!trips.some((t) => t.restaurantName === 'Quick Medical'), JSON.stringify(trips.map((t) => t.restaurantName)));
   const pocket = await svc.getDeliveryPocketDetails(String(rider._id));
-  assert.ok(pocket.transactions.payment.some((t) => /Quick Medical/.test(t.description)), JSON.stringify(pocket.transactions.payment.map((t) => t.description)));
+  assert.ok(!pocket.transactions.payment.some((t) => /Quick Medical/.test(t.description)));
+  const { summary } = await svc.getDeliveryPartnerEarnings(String(rider._id), { period: 'today' });
+  assert.equal(summary.totalEarnings, 93.46);
 });
 
 await check('trip history does NOT repeat the parcel (the app lists rides itself)', async () => {
@@ -92,11 +91,6 @@ await check('a bonus credited today appears in history, tagged, with its amount'
   assert.match(bonus.restaurantName, /^Incentive bonus · Daily incentive/);
   const cancelled = await svc.getDeliveryPartnerTripHistory(String(rider._id), { period: 'daily', status: 'Cancelled' });
   assert.ok(!cancelled.trips.some((t) => t.type === 'bonus'));
-});
-
-await check('a Medical delivery in history is tagged medical', async () => {
-  const { trips } = await svc.getDeliveryPartnerTripHistory(String(rider._id), { period: 'daily' });
-  assert.equal(trips.find((t) => t.restaurantName === 'Quick Medical')?.category, 'medical');
 });
 
 await mongoose.disconnect();

@@ -1,11 +1,11 @@
 /**
  * Logged in is not the same as allowed: taxi open-user access, unpaid wallet
- * top-ups, and the food / quick-commerce payment router.
+ * top-ups, and the food payment router.
  *
  * Run: node tests/auth-open-access.smoke.mjs
  *
- * Found by sweeping food, quick-commerce and taxi for the class of bug the
- * service-provider cash routes had:
+ * Found by sweeping food and taxi for the class of bug the service-provider
+ * cash routes had:
  *
  *  - Taxi `authenticateOrResolveUser`, on 52 customer routes: with no token, the
  *    caller became any user id it sent -- or, sending none, the OLDEST user. In
@@ -13,7 +13,7 @@
  *  - Taxi customer POST /users/wallet/topup and driver POST /drivers/wallet/top-up
  *    credited the requested amount with no payment. Together with the first: an
  *    anonymous request could credit any customer's wallet.
- *  - /v1/food/payments and /v1/qc/payments sat behind authMiddleware only: any
+ *  - /v1/food/payments sat behind authMiddleware only: any
  *    customer could create and process payouts, and read any partner's wallet.
  *
  * Real middleware and routers; the database is an in-memory replica set.
@@ -115,10 +115,9 @@ const main = async () => {
         });
     });
 
-    // --- food / QC payment routers --------------------------------------------
+    // --- food payment router -------------------------------------------------
     for (const [label, path] of [
         ['food', '../src/core/payments/payment.routes.js'],
-        ['quick-commerce', '../src/modules/quickCommerce/core/payments/payment.routes.js'],
     ]) {
         console.log(`\n${label} payments router`);
         const { default: router } = await import(path);
@@ -142,7 +141,7 @@ const main = async () => {
         const adminId = new mongoose.Types.ObjectId();
         await mongoose.connection.collection('admins').updateOne(
             { _id: adminId },
-            { $setOnInsert: { email: `admin-${adminId}@t.test`, role: 'ADMIN', adminLevel: 'platform_superadmin', admin_type: 'superadmin', permissions: ['*'], servicesAccess: ['food', 'quickCommerce', 'taxi'], isActive: true } },
+            { $setOnInsert: { email: `admin-${adminId}@t.test`, role: 'ADMIN', adminLevel: 'platform_superadmin', admin_type: 'superadmin', permissions: ['*'], servicesAccess: ['food', 'taxi'], isActive: true } },
             { upsert: true },
         );
         const admin = { id: String(adminId), role: 'ADMIN' };
@@ -179,13 +178,9 @@ const main = async () => {
     console.log('\nanonymous writes');
     {
         const { adminRouter: taxiAdminRouter } = await import('../src/modules/taxi/admin/routes/adminRoutes.js');
-        const { createRequire } = await import('node:module');
-        const req2 = createRequire(import.meta.url);
-        const spUploadRoutes = req2('../src/modules/serviceProvider/routes/admin-routes/upload.routes.js');
         const app = express();
         app.use(express.json());
         app.use('/taxi', taxiAdminRouter);
-        app.use('/sp', spUploadRoutes);
         app.use((err, _req, res, _next) => res.status(err.statusCode || err.status || 500).json({ message: err.message }));
         const { server, base } = await listen(app);
         const status = (method, url) => fetch(base + url, { method, headers: { 'content-type': 'application/json' }, body: method === 'GET' ? undefined : '{}' }).then((r) => r.status);
@@ -196,10 +191,6 @@ const main = async () => {
         });
         await check('taxi on-boarding screens stay readable before sign-in', async () => {
             assert.notEqual(await status('GET', '/taxi/on-boarding'), 401);
-        });
-        await check('SP upload signature and direct upload need a signed-in account', async () => {
-            assert.equal(await status('GET', '/sp/upload/sign-signature?folder=x'), 401);
-            assert.equal(await status('POST', '/sp/upload'), 401);
         });
         server.close();
     }

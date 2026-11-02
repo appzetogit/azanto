@@ -12,16 +12,12 @@
  *
  * Covers the multer surface the codebase depends on:
  *   - memoryStorage + .single()                 src/middleware/upload.js
- *   - limits.fileSize -> LIMIT_FILE_SIZE        src/modules/quickCommerce/middleware/upload.js
- *   - .fields() with maxCount                   serviceProvider uploadMiddleware
- *   - fileFilter rejection                      serviceProvider uploadMiddleware
- *   - multer.MulterError still an instanceof    serviceProvider handleMulterError
+ *   - limits.fileSize -> LIMIT_FILE_SIZE        src/middleware/upload.js (MAX_UPLOAD_BYTES)
+ *   - .fields() with maxCount                   registration document uploads
+ *   - fileFilter rejection                      registration document uploads
+ *   - multer.MulterError still an instanceof    error handlers branch on it
  *   - diskStorage via { dest }                  taxi userSafety.routes
  *   - text fields alongside files in req.body   every registration form
- *
- * serviceProvider's module itself is not imported: it is CommonJS and constructs a
- * CloudinaryStorage at load time, which needs live credentials. Its multer surface is
- * reproduced here instead.
  *
  * No database required.
  *
@@ -97,10 +93,12 @@ await test('memoryStorage .single() parses the file into req.file.buffer', async
 });
 
 // ── limits.fileSize ───────────────────────────────────────────────────────────
-await test('the quick-commerce size cap still raises LIMIT_FILE_SIZE', async () => {
-    // Small cap via the module's own env knob, so the real module is under test.
+await test('the upload size cap still raises LIMIT_FILE_SIZE', async () => {
+    // Small cap via the module's own env knob, so the real module is under test. The
+    // query string loads a fresh copy: the module reads the knob once, at load, and
+    // was already loaded above with the default.
     process.env.MAX_UPLOAD_BYTES = '1024';
-    const { upload } = await import('../src/modules/quickCommerce/middleware/upload.js');
+    const { upload } = await import('../src/middleware/upload.js?size-cap');
     const srv = await serve((app) => {
         app.post('/u', upload.single('image'), (req, res) => res.json({ ok: true }));
         app.use((err, _req, res, _next) => {

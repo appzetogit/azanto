@@ -13,7 +13,7 @@ const COLUMNS = [
   {
     title: 'Partners',
     links: [
-      { label: 'Drive with Azanto', href: '/taxi/signup' },
+      { label: 'Drive with Azanto', href: '/taxi/driver' },
       { label: 'Restaurant partners', href: '/food/restaurant/login' },
     ],
   },

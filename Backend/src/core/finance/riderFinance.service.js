@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { logger } from '../../utils/logger.js';
 
 /**
- * One rider, one balance, one cash-in-hand -- across taxi, food and groceries.
+ * One rider, one balance, one cash-in-hand -- across taxi and food.
  *
  * The same person drives a taxi and delivers food, and until now each vertical
  * answered "what do you have?" from its own arithmetic:
@@ -47,89 +47,38 @@ const toObjectId = (value) => {
 /**
  * Every identity the same person holds, from any one of them.
  *
- * taxidrivers is the hub: it carries legacyDeliveryPartnerId and
- * legacyQcPartnerId, and both partner records carry driverId back. So the walk
- * is at most two hops whichever end the caller starts from.
+ * taxidrivers is the hub: it carries legacyDeliveryPartnerId, and the food
+ * partner record carries driverId back. So the walk is at most two hops
+ * whichever end the caller starts from.
  *
  * A partner with no driverId is NOT an error -- riders who signed up through the
  * delivery app before unification are unlinked, and they get their food figures
  * with no taxi contribution rather than a failure.
  */
-export const resolveRiderIdentity = async (anyId) => {
-    const identity = await resolveHubIdentity(anyId);
-    return withQcRiderLink(identity);
-};
+export const resolveRiderIdentity = (anyId) => resolveHubIdentity(anyId);
 
-/**
- * The Quick & Medical rider record a Food rider delivers those orders as, and back.
- *
- * The delivery app only talks to /food/delivery/*; a Quick or Medical order is
- * accepted and completed as the linked QC rider record (core/delivery/qcRiderLink),
- * which is matched by driverId or phone and never written to
- * Driver.legacyQcPartnerId. Reading only the hub left qcPartnerId null for every
- * such rider, so their QC earnings were not withdrawable and the cash they
- * collected on QC orders never reached the shared cash limit. Mirrors the same
- * fallback in incentiveService.resolveDriverContext.
- *
- * Fills a MISSING id only: a hub-linked id is never replaced, so a rider whose
- * legacyQcPartnerId is set (and equal to the linked record) is counted once.
- */
-const withQcRiderLink = async (identity) => {
-    if (!identity || (identity.foodPartnerId && identity.qcPartnerId)) return identity;
-    if (!identity.foodPartnerId && !identity.qcPartnerId) return identity;
-    try {
-        const link = await import('../delivery/qcRiderLink.js');
-        if (identity.foodPartnerId && !identity.qcPartnerId) {
-            const qcId = toObjectId(await link.qcRiderIdForFoodRider(identity.foodPartnerId));
-            if (qcId && String(qcId) !== String(identity.foodPartnerId)) {
-                return { ...identity, qcPartnerId: qcId };
-            }
-        } else if (identity.qcPartnerId && !identity.foodPartnerId) {
-            const foodId = toObjectId(await link.foodRiderIdForQcRider(identity.qcPartnerId));
-            if (foodId && String(foodId) !== String(identity.qcPartnerId)) {
-                return { ...identity, foodPartnerId: foodId };
-            }
-        }
-    } catch (err) {
-        logger.warn(`resolveRiderIdentity: qc rider link unavailable: ${err.message}`);
-    }
-    return identity;
-};
-
-/** The hub walk: taxidrivers and the two partner records' driverId. */
+/** The hub walk: taxidrivers and the food partner record's driverId. */
 const resolveHubIdentity = async (anyId) => {
     const id = toObjectId(anyId);
-    if (!id) return { driverId: null, foodPartnerId: null, qcPartnerId: null, linked: false };
+    if (!id) return { driverId: null, foodPartnerId: null, linked: false };
 
     const { Driver } = await import('../../modules/taxi/driver/models/Driver.js');
 
-    const startedFrom = { foodPartnerId: null, qcPartnerId: null };
+    let startedFromPartner = null;
     let driver = await Driver.findById(id)
-        .select('_id legacyDeliveryPartnerId legacyQcPartnerId')
+        .select('_id legacyDeliveryPartnerId')
         .lean();
 
-    // Not a driver id, so it is one of the two partner ids: hop to the hub and
-    // re-read it, which is what picks up the OTHER vertical's partner id.
+    // Not a driver id, so it is a food partner id: hop to the hub and re-read it.
     if (!driver) {
-        const [{ FoodDeliveryPartner }, { FoodDeliveryPartner: QCDeliveryPartner }] = await Promise.all([
-            import('../../modules/food/delivery/models/deliveryPartner.model.js'),
-            import('../../modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js'),
-        ]);
-
-        const foodPartner = await FoodDeliveryPartner.findById(id).select('_id driverId').lean();
-        const partner = foodPartner || (await QCDeliveryPartner.findById(id).select('_id driverId').lean());
+        const { FoodDeliveryPartner } = await import('../../modules/food/delivery/models/deliveryPartner.model.js');
+        const partner = await FoodDeliveryPartner.findById(id).select('_id driverId').lean();
 
         if (!partner) {
-            return { driverId: null, foodPartnerId: null, qcPartnerId: null, linked: false };
+            return { driverId: null, foodPartnerId: null, linked: false };
         }
-        // Labelled by the collection it was found in. This used to call every
-        // unlinked partner a food partner, quick-commerce riders included.
-        const unlinked = foodPartner
-            ? { driverId: null, foodPartnerId: partner._id, qcPartnerId: null, linked: false }
-            : { driverId: null, foodPartnerId: null, qcPartnerId: partner._id, linked: false };
-
-        if (foodPartner) startedFrom.foodPartnerId = partner._id;
-        else startedFrom.qcPartnerId = partner._id;
+        const unlinked = { driverId: null, foodPartnerId: partner._id, linked: false };
+        startedFromPartner = partner._id;
 
         if (!partner.driverId) {
             // Unlinked: this partner id is the only identity there is.
@@ -137,7 +86,7 @@ const resolveHubIdentity = async (anyId) => {
         }
 
         driver = await Driver.findById(partner.driverId)
-            .select('_id legacyDeliveryPartnerId legacyQcPartnerId')
+            .select('_id legacyDeliveryPartnerId')
             .lean();
 
         if (!driver) {
@@ -146,26 +95,17 @@ const resolveHubIdentity = async (anyId) => {
         }
     }
 
-    if (startedFrom.foodPartnerId && driver._id && String(driver.legacyDeliveryPartnerId || '') !== String(startedFrom.foodPartnerId)) {
-        Driver.updateOne({ _id: driver._id }, { $set: { legacyDeliveryPartnerId: startedFrom.foodPartnerId } }).catch(() => {});
-    }
-    if (startedFrom.qcPartnerId && driver._id && String(driver.legacyQcPartnerId || '') !== String(startedFrom.qcPartnerId)) {
-        Driver.updateOne({ _id: driver._id }, { $set: { legacyQcPartnerId: startedFrom.qcPartnerId } }).catch(() => {});
+    if (startedFromPartner && driver._id && String(driver.legacyDeliveryPartnerId || '') !== String(startedFromPartner)) {
+        Driver.updateOne({ _id: driver._id }, { $set: { legacyDeliveryPartnerId: startedFromPartner } }).catch(() => {});
     }
 
-    const partnerIds = [
-        startedFrom.foodPartnerId,
-        driver.legacyDeliveryPartnerId,
-        startedFrom.qcPartnerId,
-        driver.legacyQcPartnerId,
-    ].filter(Boolean);
+    const partnerIds = [startedFromPartner, driver.legacyDeliveryPartnerId].filter(Boolean);
 
     return {
         driverId: driver._id,
         // The partner id the caller started from is theirs even when the hub does
-        // not name it (a hub carrying only the other vertical's id).
-        foodPartnerId: startedFrom.foodPartnerId || driver.legacyDeliveryPartnerId || null,
-        qcPartnerId: startedFrom.qcPartnerId || driver.legacyQcPartnerId || null,
+        // not name it.
+        foodPartnerId: startedFromPartner || driver.legacyDeliveryPartnerId || null,
         partnerIds,
         linked: true,
     };
@@ -205,8 +145,8 @@ export const resolveSharedCashLimit = async ({ partnerId } = {}) => {
      * The platform setting decides; the food admin figure is today's value and the
      * fallback until someone sets `finance.cashLimit` in Platform settings.
      *
-     * No vertical: a rider's limit is ONE figure across taxi, food and quick
-     * commerce -- the whole point of riderFinance -- so it is set globally, or per
+     * No vertical: a rider's limit is ONE figure across taxi and food -- the
+     * whole point of riderFinance -- so it is set globally, or per
      * partner (keyed on the rider's hub id). Vertical overrides are for partners who
      * work one vertical, such as service providers.
      */
@@ -224,12 +164,11 @@ export const resolveSharedCashLimit = async ({ partnerId } = {}) => {
 
 /**
  * The refundable security a rider has actually paid in, summed across every
- * partner identity they hold (food + quick commerce). Completed deposits only.
+ * partner identity they hold. Completed deposits only.
  *
  * Stored in the food collection because the delivery app deposits as the food
- * partner id; matched against both ids so a rider reached by their QC id still
- * sees their deposit. 0 for everyone until they pay in, so this is inert while
- * the admin-set requirement is 0.
+ * partner id. 0 for everyone until they pay in, so this is inert while the
+ * admin-set requirement is 0.
  */
 const resolveSecurityDeposited = async (partnerIds) => {
     const ids = [...new Map(partnerIds.map(toObjectId).filter(Boolean).map((id) => [String(id), id])).values()];
@@ -292,21 +231,9 @@ export const splitSignedTaxiBalance = (signedBalance) => {
 };
 
 /*
- * Where a rider's delivery money lives, per vertical. NOT shared collections.
- *
- * This used to say quick commerce wrote to the food_* collections, because its
- * models declare `collection: 'food_orders'` and so on. But each one also passes
- * an explicit third argument to mongoose.model(), and that wins:
- *
- *     mongoose.model('QCOrder', orderSchema, 'qc_orders')
- *
- * So every quick-commerce order, deposit, withdrawal and bonus is in a qc_*
- * collection, and reading only the food models meant this "single source of truth"
- * never saw any of them: QC earnings were not withdrawable, QC cash on delivery
- * never counted toward the shared cash limit, and -- the dangerous one -- an
- * APPROVED QC withdrawal was never subtracted, so money paid out through the
- * grocery app still showed as available to withdraw again. Confirmed by resolving
- * the models' collection names at runtime, not by reading schema options.
+ * Where a rider's delivery money lives, per vertical. Food is the only delivery
+ * vertical; quick commerce (its own qc_* collections) was removed, and kept no
+ * rider money in the food_* ones.
  */
 const DELIVERY_MONEY_SOURCES = [
     {
@@ -316,15 +243,6 @@ const DELIVERY_MONEY_SOURCES = [
             import('../../modules/food/delivery/models/foodDeliveryCashDeposit.model.js'),
             import('../../modules/food/delivery/models/foodDeliveryWithdrawal.model.js'),
             import('../../modules/food/admin/models/deliveryBonusTransaction.model.js'),
-        ]),
-    },
-    {
-        vertical: 'quickCommerce',
-        load: () => Promise.all([
-            import('../../modules/quickCommerce/modules/food/orders/models/order.model.js'),
-            import('../../modules/quickCommerce/modules/food/delivery/models/foodDeliveryCashDeposit.model.js'),
-            import('../../modules/quickCommerce/modules/food/delivery/models/foodDeliveryWithdrawal.model.js'),
-            import('../../modules/quickCommerce/modules/food/admin/models/deliveryBonusTransaction.model.js'),
         ]),
     },
 ];
@@ -344,17 +262,12 @@ const EMPTY_DELIVERY_MONEY = Object.freeze({
 });
 
 /**
- * Food + quick-commerce money, for every partner identity the rider holds.
- *
- * Every id is matched against BOTH verticals' collections, rather than the food id
- * against food and the QC id against QC. Pairing them depends on the identity
- * labels being right, and they were not (an unlinked QC partner was labelled a
- * food partner). Matching everywhere cannot double-count: the verticals are
- * separate collections, and a row carries exactly one deliveryPartnerId.
+ * Delivery money, for every partner identity the rider holds. A row carries
+ * exactly one deliveryPartnerId, so matching every id cannot double-count.
  */
 const resolveDeliveryMoney = async (partnerIds) => {
-    // De-duplicated: the same id reached two ways (hub link and qcRiderLink) must
-    // be one identity, never two.
+    // De-duplicated: the same id reached two ways (the caller's id and the hub
+    // link) must be one identity, never two.
     const ids = [...new Map(partnerIds.map(toObjectId).filter(Boolean).map((id) => [String(id), id])).values()];
     if (!ids.length) return { ...EMPTY_DELIVERY_MONEY, byVertical: {} };
 
@@ -510,7 +423,7 @@ const resolveBlockState = ({ taxiSigned, cashInHand, cashLimit, rules, snapshotB
     //
     // It is not a real admin hold: walletService recomputes it on every wallet
     // write as `balance <= taxi minimum balance` (default 500), so it is just a
-    // cached low-TAXI-balance signal. A food- or quick-commerce-only rider has a
+    // cached low-TAXI-balance signal. A food-only rider has a
     // 0 taxi balance and therefore reads as `wallet.isBlocked = true` -- which
     // was surfacing in the rider app as "Your wallet is blocked by admin" and
     // zeroing their availability, for work that has nothing to do with taxi.
@@ -527,7 +440,7 @@ const resolveBlockState = ({ taxiSigned, cashInHand, cashLimit, rules, snapshotB
 /**
  * The single source of truth. Everything else in this file exists to serve it.
  *
- * @param {string|object} anyId  a taxi driver id, a food partner id, or a QC partner id
+ * @param {string|object} anyId  a taxi driver id or a food partner id
  */
 export const getRiderFinance = async (anyId, { driverWallet = null } = {}) => {
     const identity = await resolveRiderIdentity(anyId);
@@ -555,10 +468,10 @@ export const getRiderFinance = async (anyId, { driverWallet = null } = {}) => {
         // Partner overrides are keyed on the rider's hub identity: the taxi driver id
         // for a linked rider, else their own partner id.
         resolveSharedCashLimit({
-            partnerId: identity.driverId || identity.foodPartnerId || identity.qcPartnerId || undefined,
+            partnerId: identity.driverId || identity.foodPartnerId || undefined,
         }),
-        resolveDeliveryMoney([identity.foodPartnerId, identity.qcPartnerId, ...(identity.partnerIds || [])]),
-        resolveSecurityDeposited([identity.foodPartnerId, identity.qcPartnerId, ...(identity.partnerIds || [])]),
+        resolveDeliveryMoney([identity.foodPartnerId, ...(identity.partnerIds || [])]),
+        resolveSecurityDeposited([identity.foodPartnerId, ...(identity.partnerIds || [])]),
     ]);
 
     const taxi = splitSignedTaxiBalance(wallet?.balance || 0);
@@ -573,7 +486,7 @@ export const getRiderFinance = async (anyId, { driverWallet = null } = {}) => {
     const cashInHand = Math.max(0, round2(taxi.cashHeldPortion + delivery.cashInHandRaw));
 
     /*
-     * Refundable security deposit (delivery / food+quick). Inert while the
+     * Refundable security deposit (delivery). Inert while the
      * admin-set requirement is 0: nothing is locked and securityMet is true, so
      * no rider is gated and the full balance stays withdrawable.
      *
@@ -607,7 +520,6 @@ export const getRiderFinance = async (anyId, { driverWallet = null } = {}) => {
     return {
         driverId: identity.driverId ? String(identity.driverId) : null,
         foodPartnerId: identity.foodPartnerId ? String(identity.foodPartnerId) : null,
-        qcPartnerId: identity.qcPartnerId ? String(identity.qcPartnerId) : null,
         linked: identity.linked,
 
         // The unified figures. Every screen shows these.
@@ -619,7 +531,7 @@ export const getRiderFinance = async (anyId, { driverWallet = null } = {}) => {
         isBlocked: block.isBlocked,
         blockReason: block.reason,
 
-        // Security deposit (delivery). securityMet drives the food/quick dispatch
+        // Security deposit (delivery). securityMet drives the food dispatch
         // gate and the app's onboarding prompt; withdrawableBalance is what the
         // withdrawal path may pay out (balance minus the locked deposit). All inert
         // when requiredSecurityDeposit is 0.

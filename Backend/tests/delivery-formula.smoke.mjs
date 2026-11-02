@@ -4,8 +4,7 @@
  * Run: node tests/delivery-formula.smoke.mjs
  *
  * Checks the maths, the validation, that today's band tables translate into the
- * formula without changing a single price, and that quick commerce's fee and
- * rider-pay functions use the formula once it is set.
+ * formula without changing a single price.
  */
 import assert from 'node:assert/strict';
 import { normalizeFormula, priceDelivery, formulaFromSlabs } from '../src/core/finance/deliveryFormula.js';
@@ -108,21 +107,6 @@ check('a band with an extra per km translates exactly too', () => {
   const f = normalizeFormula(formulaFromSlabs(t));
   assert.equal(f.mode, 'simple');
   for (const d of [1, 6, 30]) assert.equal(priceDelivery(f, d).customerFee, bandFee(pickSlab(t, d), d).fee);
-});
-
-console.log('\nQuick commerce uses it once set');
-const qc = await import('../src/modules/quickCommerce/modules/food/orders/services/order-pricing.service.js');
-check('fee and rider pay come from the formula', () => {
-  const feeSettings = { deliveryFeeRanges: [{ min: 0, max: 100, fee: 999, deliveryBoyBasePay: 999 }], deliveryFormula: { formula: simple } };
-  assert.equal(qc.resolveUserDeliveryFee(feeSettings, { distanceKm: 5 }).deliveryFee, 49);
-  assert.equal(qc.calculateRiderEarning(feeSettings, 5), 38);
-  // Unmeasured trip: the base fee, as before.
-  assert.equal(qc.resolveUserDeliveryFee(feeSettings, { distanceKm: null }).deliveryFee, 25);
-});
-check('without a formula the old band table still applies', () => {
-  const feeSettings = { deliveryFeeRanges: [{ min: 0, max: 100, fee: 30, deliveryBoyBasePay: 22 }] };
-  assert.equal(qc.resolveUserDeliveryFee(feeSettings, { distanceKm: 5 }).deliveryFee, 30);
-  assert.equal(qc.calculateRiderEarning(feeSettings, 5), 22);
 });
 
 console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll delivery formula checks passed');

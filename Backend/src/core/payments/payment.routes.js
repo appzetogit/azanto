@@ -20,7 +20,7 @@ import { requireFinancePermission } from '../admin/requireFinancePermission.midd
 const router = express.Router();
 
 /*
- * Mounted as /v1/food/payments and /v1/qc/payments behind authMiddleware ONLY --
+ * Mounted as /v1/food/payments behind authMiddleware ONLY --
  * which proves someone is logged in, not who. Every route below trusted that:
  *
  *   - /admin/settlements (create, process): any customer, restaurant or rider could

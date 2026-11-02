@@ -30,7 +30,7 @@ export const ADMIN_SERVICES = [
 export const ADMIN_SERVICE_KEYS = ADMIN_SERVICES.map((s) => s.key);
 
 // The panels the admin UI offers and lets anyone grant. The product is food + taxi
-// only -- quick commerce and medical are switched off -- so only these two are
+// only -- quick commerce and medical were removed -- so only these two are
 // exposed. ADMIN_SERVICES above deliberately still knows the other two: it is what
 // stored servicesAccess values are read against, and dropping 'quickCommerce' there
 // would send a QC-only sub-admin to effectiveServices' ['food'] fallback, i.e.

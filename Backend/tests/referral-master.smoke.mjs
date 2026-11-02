@@ -1,5 +1,5 @@
 /**
- * Master > Referral: one set of referral amounts for Food, Quick & Medical and Taxi.
+ * Master > Referral: one set of referral amounts for Food and Taxi.
  *
  * Run: node tests/referral-master.smoke.mjs
  *
@@ -7,7 +7,8 @@
  *   - with nothing set in Master, every service pays exactly what its own
  *     screen says (this reaches wallet-crediting code; a new screen must not
  *     move money until someone saves on it);
- *   - a global amount reaches all three services; a per-service value beats it;
+ *   - a global amount reaches both services; a per-service value beats it;
+ *   - the overview lists Food and Taxi only (quick commerce is gone);
  *   - Taxi keeps its own rules (programme type, rides first) and only takes the
  *     amount, with 0 switching its programme off;
  *   - clearing a Master value hands the number back to the service;
@@ -38,13 +39,11 @@ await mongoose.connect(process.env.MONGO_URI);
 const referral = await import('../src/core/referral/referralSettings.service.js');
 const resolver = await import('../src/core/config/resolver.service.js');
 const { FoodReferralSettings } = await import('../src/modules/food/admin/models/referralSettings.model.js');
-const { FoodReferralSettings: QuickReferralSettings } = await import('../src/modules/quickCommerce/modules/food/admin/models/referralSettings.model.js');
 const { AdminBusinessSetting } = await import('../src/modules/taxi/admin/models/AdminBusinessSetting.js');
 const { getUserReferralStats } = await import('../src/modules/food/user/services/userReferral.service.js');
 
 // Each service's own settings, as its admin screen saved them.
 await FoodReferralSettings.create({ referralRewardUser: 20, referralLimitUser: 5, referralRewardDelivery: 70, referralLimitDelivery: 2, isActive: true });
-await QuickReferralSettings.create({ referralRewardUser: 30, referralLimitUser: 3, referralRewardDelivery: 80, referralLimitDelivery: 4, isActive: true, referralLinkUser: 'https://x/?ref={code}' });
 await AdminBusinessSetting.create({
   scope: 'default',
   referral: {
@@ -59,14 +58,11 @@ const setMaster = (key, value, vertical = null) =>
 
 console.log('\nNothing set in Master');
 
-await check('Food, Quick and Taxi pay what their own screens say', async () => {
+await check('Food and Taxi pay what their own screens say', async () => {
   const food = await referral.referralSettingsFor('food', FoodReferralSettings);
   assert.equal(food.referralRewardUser, 20);
   assert.equal(food.referralLimitUser, 5);
   assert.equal(food.referralRewardDelivery, 70);
-  const quick = await referral.referralSettingsFor('quickCommerce', QuickReferralSettings);
-  assert.equal(quick.referralRewardUser, 30);
-  assert.equal(quick.referralLinkUser, 'https://x/?ref={code}');
   const taxi = await taxiOwn();
   assert.deepEqual(await referral.taxiReferralFor('user', taxi.user), taxi.user);
   assert.deepEqual(await referral.taxiReferralFor('driver', taxi.driver), taxi.driver);
@@ -80,10 +76,9 @@ await check('the app shows the food amount from the food screen', async () => {
 
 console.log('\nSet once for everyone');
 
-await check('a global customer reward reaches all three services', async () => {
+await check('a global customer reward reaches both services', async () => {
   await setMaster('referral.customerReward', 50);
   assert.equal((await referral.referralSettingsFor('food', FoodReferralSettings)).referralRewardUser, 50);
-  assert.equal((await referral.referralSettingsFor('quickCommerce', QuickReferralSettings)).referralRewardUser, 50);
   const taxiUser = await referral.taxiReferralFor('user', (await taxiOwn()).user);
   assert.equal(taxiUser.amount, 50);
   assert.equal(taxiUser.enabled, true);
@@ -112,9 +107,9 @@ await check('the app shows the Master amount, which is what is paid', async () =
 console.log('\nPer-service overrides');
 
 await check('a per-service value beats the global one, for that service only', async () => {
-  await setMaster('referral.customerReward', 25, 'quickCommerce');
-  assert.equal((await referral.referralSettingsFor('quickCommerce', QuickReferralSettings)).referralRewardUser, 25);
-  assert.equal((await referral.referralSettingsFor('food', FoodReferralSettings)).referralRewardUser, 50);
+  await setMaster('referral.customerReward', 25, 'food');
+  assert.equal((await referral.referralSettingsFor('food', FoodReferralSettings)).referralRewardUser, 25);
+  assert.equal((await referral.taxiReferralFor('user', (await taxiOwn()).user)).amount, 50);
 });
 
 await check('0 for Taxi switches its referral programme off', async () => {
@@ -139,9 +134,9 @@ await check('a rider/driver reward switches Taxi drivers on and pays Food riders
 await check('the overview says where each number comes from', async () => {
   const { services } = await referral.referralOverview();
   const by = Object.fromEntries(services.map((s) => [s.vertical, s]));
-  assert.deepEqual(by.food.customerReward, { value: 50, from: 'master' });
+  assert.deepEqual(services.map((s) => s.vertical), ['food', 'taxi']);
+  assert.deepEqual(by.food.customerReward, { value: 25, from: 'master' });
   assert.deepEqual(by.food.customerLimit, { value: 5, from: 'service' });
-  assert.deepEqual(by.quickCommerce.customerReward, { value: 25, from: 'master' });
   assert.deepEqual(by.taxi.customerReward, { value: 0, from: 'master' });
   assert.deepEqual(by.taxi.partnerLimit, { value: null, from: 'none' });
   assert.equal(by.taxi.afterRides.user, 2);
@@ -151,10 +146,9 @@ console.log('\nClearing');
 
 await check('clearing Master hands every number back to the services', async () => {
   for (const key of ['referral.customerReward', 'referral.partnerReward', 'referral.partnerLimit']) await setMaster(key, null);
-  await setMaster('referral.customerReward', null, 'quickCommerce');
+  await setMaster('referral.customerReward', null, 'food');
   await setMaster('referral.customerReward', null, 'taxi');
   assert.equal((await referral.referralSettingsFor('food', FoodReferralSettings)).referralRewardUser, 20);
-  assert.equal((await referral.referralSettingsFor('quickCommerce', QuickReferralSettings)).referralRewardUser, 30);
   const taxi = await taxiOwn();
   assert.deepEqual(await referral.taxiReferralFor('user', taxi.user), taxi.user);
 });

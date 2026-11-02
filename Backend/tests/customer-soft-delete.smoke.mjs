@@ -17,15 +17,14 @@ const check = async (label, fn) => {
 
 const db = mongoose.connection.db;
 const { FoodUser } = await import('../src/core/users/user.model.js');
-const { FoodRefreshToken, QCRefreshToken } = await import('../src/core/refreshTokens/refreshToken.model.js');
+const { FoodRefreshToken } = await import('../src/core/refreshTokens/refreshToken.model.js');
 const food = await import('../src/modules/food/user/services/userProfile.service.js');
-const quick = await import('../src/modules/quickCommerce/modules/food/user/services/userProfile.service.js');
 
 const u = await FoodUser.create({ name: 'Asha', phone: '9800000001', isVerified: true });
+// Left behind by the removed quick-commerce vertical; nothing touches it now.
 const qc = (await db.collection('qc_users').insertOne({ phone: '9800000001', platformUserId: u._id, isActive: true })).insertedId;
 await db.collection('food_orders').insertOne({ order_id: 'FOD-1', userId: u._id });
 await FoodRefreshToken.collection.insertOne({ userId: u._id, token: 'a', expiresAt: new Date(Date.now() + 1e9) });
-await QCRefreshToken.collection.insertOne({ userId: qc, token: 'b', expiresAt: new Date(Date.now() + 1e9) });
 
 await check('delete keeps the record but closes it', async () => {
   const r = await food.deleteCurrentUserAccount(String(u._id), { reason: 'not using it' });
@@ -38,12 +37,11 @@ await check('delete keeps the record but closes it', async () => {
   assert.ok(await db.collection('food_orders').findOne({ order_id: 'FOD-1' }), 'order kept');
 });
 
-await check('signed out everywhere, Quick record closed', async () => {
+await check('signed out, and the old quick-commerce row left alone', async () => {
   assert.equal(await FoodRefreshToken.countDocuments({ userId: u._id }), 0);
-  assert.equal(await QCRefreshToken.countDocuments({ userId: qc }), 0);
   const q = await db.collection('qc_users').findOne({ _id: qc });
-  assert.equal(q.isActive, false);
-  assert.ok(q.deletedAt);
+  assert.equal(q.isActive, true);
+  assert.equal(q.deletedAt, undefined);
 });
 
 await check('the number is free for a new sign-up', async () => {
@@ -52,8 +50,8 @@ await check('the number is free for a new sign-up', async () => {
   assert.notEqual(String(fresh._id), String(u._id));
 });
 
-await check('deleting twice is fine; the Quick endpoint does the same', async () => {
-  const again = await quick.deleteCurrentUserAccount(String(u._id));
+await check('deleting twice is fine', async () => {
+  const again = await food.deleteCurrentUserAccount(String(u._id));
   assert.equal(again.success, true);
 });
 

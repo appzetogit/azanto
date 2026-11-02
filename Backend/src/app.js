@@ -17,35 +17,6 @@ import { healthCheck } from './config/health.js';
 
 const app = express();
 
-// Service-Provider (Homster) came in as a CJS app whose Mongoose models reject
-// explicit nulls, so its integration added a global null-stripper. Global was too
-// wide: every other vertical uses null to mean "clear this field", and having it
-// deleted before the controller ran made those saves no-ops that still reported
-// success -- e.g. an earning add-on could never be set back to unlimited
-// redemptions. Scoped to the paths that actually needed it.
-const SP_NULL_STRIP_PREFIXES = [
-    '/api/v1/sp',
-    '/api/users', '/api/user', '/api/vendors', '/api/workers', '/api/bookings',
-    '/api/scrap', '/api/image', '/api/public'
-];
-
-const needsNullStrip = (p) => SP_NULL_STRIP_PREFIXES.some((x) => p === x || p.startsWith(`${x}/`));
-
-const stripNullsDeep = (value) => {
-    if (Array.isArray(value)) {
-        return value.map(stripNullsDeep);
-    }
-    if (value && typeof value === 'object') {
-        const next = {};
-        for (const [k, v] of Object.entries(value)) {
-            if (v === null) continue;
-            next[k] = stripNullsDeep(v);
-        }
-        return next;
-    }
-    return value;
-};
-
 // Trust first proxy (essential for express-rate-limit if behind a proxy)
 app.set('trust proxy', 1);
 
@@ -134,11 +105,6 @@ app.use((req, _res, next) => {
     req.body = mongoSanitize(req.body);
     req.query = mongoSanitize(req.query);
     req.params = mongoSanitize(req.params);
-    if (needsNullStrip(req.path)) {
-        req.body = stripNullsDeep(req.body);
-        req.query = stripNullsDeep(req.query);
-        req.params = stripNullsDeep(req.params);
-    }
     next();
 });
 

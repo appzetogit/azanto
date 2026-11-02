@@ -4,12 +4,14 @@
  * Run: node tests/app-services.smoke.mjs
  *
  * What this guards:
- *   - nothing is hidden until an admin hides it -- a fresh platform shows all four;
+ *   - the app offers food and taxi only: quick commerce and medical are gone, so
+ *     they are neither listed nor switchable, and a rule stored for them is ignored;
+ *   - nothing is hidden until an admin hides it -- a fresh platform shows both;
  *   - "off everywhere" beats any zone;
  *   - "off in a zone" hides the service only for customers inside that zone, and
  *     only that service -- food's zone switch must not hide taxi;
- *   - each service is judged on its OWN map (food, quick and medical polygons,
- *     taxi's GeoJSON), because the same address can be in one and not another;
+ *   - each service is judged on its OWN map (food's polygons, taxi's GeoJSON),
+ *     because the same address can be in one and not another;
  *   - being outside every zone does not hide a tile;
  *   - the app's read is public, the admin's writes need an admin.
  */
@@ -41,8 +43,6 @@ const svc = await import('../src/core/appServices/appServices.service.js');
 const routes = (await import('../src/core/appServices/appServices.routes.js')).default;
 const { signAccessToken } = await import('../src/core/auth/token.util.js');
 const { FoodZone } = await import('../src/modules/food/admin/models/zone.model.js');
-const { QCZone } = await import('../src/modules/quickCommerce/modules/food/admin/models/zone.model.js');
-const { MedicalZone } = await import('../src/modules/quickCommerce/modules/food/admin/models/medicalZone.model.js');
 const { Zone: TaxiZone } = await import('../src/modules/taxi/driver/models/Zone.js');
 await TaxiZone.init(); // the 2dsphere index $geoIntersects needs
 
@@ -65,10 +65,8 @@ const geo = ({ lat, lng }, d = 0.1) => ({
 });
 
 const foodIndore = await FoodZone.create({ name: 'Indore Food', isActive: true, coordinates: ring(INDORE) });
-await FoodZone.create({ name: 'Bhopal Food', isActive: true, coordinates: ring(BHOPAL) });
-await QCZone.create({ name: 'Indore Quick', isActive: true, coordinates: ring(INDORE) });
-// Medical is drawn only in Bhopal: Indore is outside every medical zone.
-await MedicalZone.create({ name: 'Bhopal Medical', isActive: true, coordinates: ring(BHOPAL) });
+const foodBhopal = await FoodZone.create({ name: 'Bhopal Food', isActive: true, coordinates: ring(BHOPAL) });
+// Taxi is drawn only in Indore: Bhopal is outside every taxi zone.
 const taxiIndore = await TaxiZone.create({ name: 'Indore Taxi', active: true, geometry: geo(INDORE) });
 
 const at = async (point) => {
@@ -79,18 +77,19 @@ const at = async (point) => {
 
 console.log('\nnothing hidden until someone hides it');
 
-await check('a fresh platform shows all four services', async () => {
+await check('a fresh platform shows both services, and only those', async () => {
     const s = await at(INDORE);
-    assert.deepEqual(Object.keys(s).sort(), ['food', 'medical', 'quick', 'taxi']);
+    assert.deepEqual(Object.keys(s).sort(), ['food', 'taxi']);
     for (const key of Object.keys(s)) assert.equal(s[key].visible, true, `${key} hidden`);
 });
 
 await check('each service reports its own zone at the same address', async () => {
     const s = await at(INDORE);
     assert.equal(s.food.zone?.name, 'Indore Food');
-    assert.equal(s.quick.zone?.name, 'Indore Quick');
     assert.equal(s.taxi.zone?.name, 'Indore Taxi', 'taxi GeoJSON zone not found');
-    assert.equal(s.medical.inZone, false, 'Indore has no medical zone');
+    const bhopal = await at(BHOPAL);
+    assert.equal(bhopal.food.zone?.name, 'Bhopal Food');
+    assert.equal(bhopal.taxi.inZone, false, 'Bhopal has no taxi zone');
 });
 
 await check('outside every zone is not a reason to hide a tile', async () => {
@@ -114,9 +113,8 @@ await check('  but still shown in Bhopal', async () => {
     assert.equal((await at(BHOPAL)).food.visible, true);
 });
 
-await check('  and only food: quick and taxi in Indore are untouched', async () => {
+await check('  and only food: taxi in Indore is untouched', async () => {
     const s = await at(INDORE);
-    assert.equal(s.quick.visible, true);
     assert.equal(s.taxi.visible, true);
 });
 
@@ -141,26 +139,26 @@ await check('switching the zone back on shows it again, with one rule stored', a
 
 await check('a zone id from another service is refused', async () => {
     await assert.rejects(
-        () => svc.setZoneEnabled('medical', String(foodIndore._id), false),
+        () => svc.setZoneEnabled('taxi', String(foodIndore._id), false),
         /does not exist for this service/,
     );
 });
 
 console.log('\neverywhere');
 
-await check('medical switched off everywhere: hidden in every city, and with no location', async () => {
-    await svc.setServiceEnabled('medical', false, { actorId: 'admin1' });
-    assert.equal((await at(INDORE)).medical.visible, false);
-    assert.equal((await at(BHOPAL)).medical.reason, 'disabled');
-    assert.equal((await at(null)).medical.visible, false);
+await check('food switched off everywhere: hidden in every city, and with no location', async () => {
+    await svc.setServiceEnabled('food', false, { actorId: 'admin1' });
+    assert.equal((await at(INDORE)).food.visible, false);
+    assert.equal((await at(BHOPAL)).food.reason, 'disabled');
+    assert.equal((await at(null)).food.visible, false);
+    assert.equal((await at(INDORE)).taxi.visible, true, 'taxi untouched');
 });
 
 await check('off everywhere beats a zone that is switched on', async () => {
-    const medical = await MedicalZone.findOne({ name: 'Bhopal Medical' });
-    await svc.setZoneEnabled('medical', String(medical._id), true);
-    assert.equal((await at(BHOPAL)).medical.visible, false);
-    await svc.setServiceEnabled('medical', true);
-    assert.equal((await at(BHOPAL)).medical.visible, true);
+    await svc.setZoneEnabled('food', String(foodBhopal._id), true);
+    assert.equal((await at(BHOPAL)).food.visible, false);
+    await svc.setServiceEnabled('food', true);
+    assert.equal((await at(BHOPAL)).food.visible, true);
 });
 
 await check('the admin view lists every service with its zones and switches', async () => {
@@ -175,18 +173,22 @@ await check('the admin view lists every service with its zones and switches', as
     await svc.setZoneEnabled('food', String(foodIndore._id), true);
 });
 
-await check('unknown services and non-boolean values are refused', async () => {
+await check('unknown and removed services, and non-boolean values, are refused', async () => {
     await assert.rejects(() => svc.setServiceEnabled('parcel', false), /Unknown service/);
+    await assert.rejects(() => svc.setServiceEnabled('quick', false), /Unknown service/);
+    await assert.rejects(() => svc.setServiceEnabled('medical', false), /Unknown service/);
+    await assert.rejects(() => svc.setZoneEnabled('quick', String(foodIndore._id), false), /Unknown service/);
     await assert.rejects(() => svc.setServiceEnabled('food', 'no'), /true or false/);
 });
 
 await check('the rule alone: a stored rule for a service not in the list is ignored', () => {
     const state = rules.normalizeAppServicesState({
-        services: { food: { enabled: false }, bogus: { enabled: false } },
-        zoneRules: [{ service: 'bogus', zoneId: 'z', enabled: false }],
+        services: { food: { enabled: false }, bogus: { enabled: false }, quick: { enabled: false } },
+        zoneRules: [{ service: 'bogus', zoneId: 'z', enabled: false }, { service: 'medical', zoneId: 'm', enabled: false }],
     });
     assert.equal(state.services.food.enabled, false);
     assert.equal(state.services.bogus, undefined);
+    assert.equal(state.services.quick, undefined);
     assert.equal(state.zoneRules.length, 0);
 });
 
@@ -204,7 +206,7 @@ await check('the app reads without signing in', async () => {
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.data.located, true);
-    assert.equal(body.data.services.length, 4);
+    assert.deepEqual(body.data.services.map((s) => s.key).sort(), ['food', 'taxi']);
 });
 
 await check('the admin view needs a token', async () => {

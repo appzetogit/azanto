@@ -16,23 +16,22 @@ const check = async (label, fn) => {
 };
 
 const { FoodOrder } = await import('../src/modules/food/orders/models/order.model.js');
-const { FoodOrder: QcOrder } = await import('../src/modules/quickCommerce/modules/food/orders/models/order.model.js');
 const { Ride } = await import('../src/modules/taxi/user/models/Ride.js');
 const { deleteMasterOrder, listMasterOrders } = await import('../src/core/orders/masterOrders.service.js');
 const ins = async (M, doc) => (await M.collection.insertOne({ createdAt: new Date(), ...doc })).insertedId;
 
 const cancelledFood = await ins(FoodOrder, { order_id: 'FOD-C', orderStatus: 'cancelled_by_restaurant', payment: { method: 'cash', status: 'cod_pending' } });
 const liveFood = await ins(FoodOrder, { order_id: 'FOD-L', orderStatus: 'preparing', payment: { method: 'cash' } });
-const unpaidMed = await ins(QcOrder, { order_id: 'MED-P', orderStatus: 'pending_payment', payment: { method: 'razorpay', status: 'pending' } });
-const paidQc = await ins(QcOrder, { order_id: 'QC-D', orderStatus: 'delivered', payment: { method: 'razorpay', status: 'paid' } });
+const unpaidFood = await ins(FoodOrder, { order_id: 'FOD-P', orderStatus: 'pending_payment', payment: { method: 'razorpay', status: 'pending' } });
+const paidFood = await ins(FoodOrder, { order_id: 'FOD-D', orderStatus: 'delivered', payment: { method: 'razorpay', status: 'paid' } });
 const doneRide = await ins(Ride, { serviceType: 'parcel', status: 'cancelled', liveStatus: 'cancelled', fare: 50 });
 const liveRide = await ins(Ride, { serviceType: 'ride', status: 'accepted', liveStatus: 'accepted', fare: 90 });
 
-await check('a cancelled Food order and an unpaid Medical order are deleted', async () => {
+await check('a cancelled Food order and an unpaid one are deleted', async () => {
   assert.equal((await deleteMasterOrder({ source: 'food', id: String(cancelledFood) })).deleted, true);
   assert.equal(await FoodOrder.collection.findOne({ _id: cancelledFood }), null);
-  assert.equal((await deleteMasterOrder({ source: 'medical', id: String(unpaidMed) })).deleted, true);
-  assert.equal(await QcOrder.collection.findOne({ _id: unpaidMed }), null);
+  assert.equal((await deleteMasterOrder({ source: 'food', id: String(unpaidFood) })).deleted, true);
+  assert.equal(await FoodOrder.collection.findOne({ _id: unpaidFood }), null);
 });
 
 await check('an order in progress is refused', async () => {
@@ -40,9 +39,15 @@ await check('an order in progress is refused', async () => {
   assert.ok(await FoodOrder.collection.findOne({ _id: liveFood }));
 });
 
-await check('a delivered, paid Quick order is refused (payment and payouts stay)', async () => {
-  await assert.rejects(deleteMasterOrder({ source: 'quick', id: String(paidQc) }), /delivered or paid/);
-  assert.ok(await QcOrder.collection.findOne({ _id: paidQc }));
+await check('a delivered, paid order is refused (payment and payouts stay)', async () => {
+  await assert.rejects(deleteMasterOrder({ source: 'food', id: String(paidFood) }), /cannot be deleted/);
+  assert.ok(await FoodOrder.collection.findOne({ _id: paidFood }));
+});
+
+await check('the removed quick and medical sources are refused', async () => {
+  for (const source of ['quick', 'medical']) {
+    await assert.rejects(deleteMasterOrder({ source, id: String(paidFood) }), /Unknown order type/);
+  }
 });
 
 await check('a finished trip is removed from the lists; a live one is refused', async () => {

@@ -3,7 +3,7 @@
  *
  * Run: node tests/bulk-upload-approval.smoke.mjs
  *
- * For a restaurant (Food) and a store (quick commerce):
+ * For a restaurant (Food):
  *   bulk upload -> items are pending and hidden from the public menu
  *               -> they appear in the admin's pending-approvals list
  *               -> approve one, bulk-approve the rest
@@ -45,7 +45,6 @@ const menuNames = (menu) => {
 
 const VERTICALS = [
     { label: 'restaurant', base: '../src/modules/food', storeType: undefined },
-    { label: 'store', base: '../src/modules/quickCommerce/modules/food', storeType: 'grocery' },
 ];
 
 const main = async () => {
@@ -64,15 +63,15 @@ const main = async () => {
 
         const seller = await FoodRestaurant.create({
             restaurantName: `${label} approval test`, ownerName: 'O',
-            ownerPhone: label === 'store' ? '9000000031' : '9000000032',
+            ownerPhone: '9000000032',
             status: 'approved', pureVegRestaurant: false, ...(storeType ? { storeType } : {}),
         });
         const sid = String(seller._id);
 
         const upload = async (rows) => {
-            const wb = label === 'store' ? await bulk.generateBulkMenuTemplate() : new ExcelJS.Workbook();
-            const ws = wb.worksheets[0] || wb.addWorksheet('Menu');
-            if (label !== 'store') ws.addRow(['Category', 'Item Name', 'Description', 'Base Price', 'Food Type']);
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Menu');
+            ws.addRow(['Category', 'Item Name', 'Description', 'Base Price', 'Food Type']);
             rows.forEach((r, i) => { ws.getRow(i + 2).values = r; });
             return bulk.processBulkMenuUpload(sid, Buffer.from(await wb.xlsx.writeBuffer()));
         };

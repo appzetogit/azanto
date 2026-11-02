@@ -24,10 +24,7 @@ const admin = await import('../src/modules/food/admin/services/admin.service.js'
 const driverId = oid();
 await db.collection('taxidrivers').insertOne({ _id: driverId, name: 'R', phone: '+919833300001', approve: true });
 const rider = await FoodDeliveryPartner.create({ name: 'Rider', phone: '9833300001', status: 'approved', driverId, vehicleNumber: 'MP09ZZ0001' });
-const qcCopy = oid();
-await db.collection('qc_delivery_partners').insertOne({ _id: qcCopy, name: 'Rider', phone: '9833300001', status: 'approved' });
 await db.collection('food_delivery_wallets').insertOne({ deliveryPartnerId: rider._id, balance: 0 });
-await db.collection('qc_delivery_wallets').insertOne({ deliveryPartnerId: qcCopy, balance: 0 });
 await db.collection('food_delivery_profiles').insertOne({ driverId, legacyDeliveryPartnerId: rider._id });
 await FoodOrder.collection.insertOne({ order_id: 'FOD-OLD', orderStatus: 'delivered', dispatch: { status: 'accepted', deliveryPartnerId: rider._id }, createdAt: new Date() });
 
@@ -43,14 +40,12 @@ await check('a rider with money on the account is not deleted without a second y
   assert.equal(await FoodDeliveryPartner.findById(rich._id).lean(), null);
 });
 
-await check('delete removes the rider, its Quick copy, taxi record, wallets and profile; orders stay', async () => {
+await check('delete removes the rider, its taxi record, wallet and profile; orders stay', async () => {
   const out = await admin.deleteDeliveryPartnerPermanently(String(rider._id));
   assert.equal(out.deleted, true);
   assert.equal(await FoodDeliveryPartner.findById(rider._id).lean(), null);
-  assert.equal(await db.collection('qc_delivery_partners').findOne({ _id: qcCopy }), null);
   assert.equal(await db.collection('taxidrivers').findOne({ _id: driverId }), null);
   assert.equal(await db.collection('food_delivery_wallets').countDocuments({ deliveryPartnerId: rider._id }), 0);
-  assert.equal(await db.collection('qc_delivery_wallets').countDocuments({ deliveryPartnerId: qcCopy }), 0);
   assert.equal(await db.collection('food_delivery_profiles').countDocuments({ legacyDeliveryPartnerId: rider._id }), 0);
   assert.ok(await FoodOrder.collection.findOne({ order_id: 'FOD-OLD' }), 'past order was removed');
 });

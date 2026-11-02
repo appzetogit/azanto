@@ -57,12 +57,6 @@ const ZONE_SOURCES = {
             contains: polygonContains,
         };
     },
-    async quick() {
-        return qcZones('quick');
-    },
-    async medical() {
-        return qcZones('medical');
-    },
     async taxi() {
         const { Zone } = await import('../../modules/taxi/driver/models/Zone.js');
         return {
@@ -79,10 +73,10 @@ const ZONE_SOURCES = {
 
 /**
  * A module's zones for an admin picker: id, name, whether active.
- * `module` is the settings name ('food' | 'quickCommerce' | 'medical' | 'taxi').
+ * `module` is the settings name ('food' | 'taxi').
  */
 export async function listZonesFor(module) {
-    const key = { food: 'food', quickCommerce: 'quick', medical: 'medical', taxi: 'taxi' }[module];
+    const key = { food: 'food', taxi: 'taxi' }[module];
     if (!key) return null;
     const source = await ZONE_SOURCES[key]();
     const docs = await source.list();
@@ -91,19 +85,7 @@ export async function listZonesFor(module) {
         .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
 }
 
-async function qcZones(vertical) {
-    const { zoneModelFor } = await import(
-        '../../modules/quickCommerce/modules/food/shared/zoneServiceability.js'
-    );
-    const Model = zoneModelFor(vertical);
-    return {
-        list: () => Model.find({}).select('name zoneName isActive coordinates').lean(),
-        active: (z) => z.isActive !== false,
-        contains: polygonContains,
-    };
-}
-
-/** Ray casting over the [{latitude, longitude}] rings food, quick and medical store. */
+/** Ray casting over the [{latitude, longitude}] rings food zones store. */
 function polygonContains(zone, lat, lng) {
     const ring = Array.isArray(zone?.coordinates) ? zone.coordinates : [];
     if (ring.length < 3) return false;
@@ -191,7 +173,7 @@ export async function resolveAppServicesAt({ lat, lng } = {}) {
 
 // ------------------------------------------------- riders in a zone ----
 
-const DELIVERY_SERVICES = new Set(['food', 'quick', 'medical']);
+const DELIVERY_SERVICES = new Set(['food']);
 // Same window dispatch uses (DISPATCH_STALE_GPS_MS): older positions do not count.
 const RIDER_FRESH_MS = Number(process.env.DISPATCH_STALE_GPS_MS) || 45 * 60 * 1000;
 const RIDER_COUNT_TTL_MS = 30 * 1000;
@@ -199,8 +181,8 @@ const riderCountCache = new Map(); // `${service}:${zoneId}` -> { at, value }
 
 /**
  * Online riders with a recent position inside this service's zone. The
- * delivery app goes online on the Food side for every delivery service, so
- * Food riders are counted against the Food, Quick or Medical zone polygon.
+ * delivery app goes online on the Food side, so Food riders are counted
+ * against the Food zone polygon.
  */
 async function ridersOnlineInZone(service, zoneId) {
     const key = `${service}:${zoneId}`;

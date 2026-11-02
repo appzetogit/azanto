@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodDeliveryPartner } from '../../../modules/food/delivery/models/deliveryPartner.model.js';
-import { FoodDeliveryPartner as QCDeliveryPartner } from '../../../modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js';
 import { FoodOrder } from '../../../modules/food/orders/models/order.model.js';
-import { FoodOrder as QCOrder } from '../../../modules/quickCommerce/modules/food/orders/models/order.model.js';
 import { Driver } from '../../../modules/taxi/driver/models/Driver.js';
 import { Ride } from '../../../modules/taxi/user/models/Ride.js';
 import { DriverIncentiveRule } from '../models/driverIncentiveRule.model.js';
@@ -59,9 +57,9 @@ function windowBoundsFor(rule, at = new Date()) {
 }
 
 /**
- * Resolves the caller's unified identity from any one of its three possible
- * starting points, so a food order, a QC order and a ride all agree on the
- * same rider for progress-counting and credit idempotency.
+ * Resolves the caller's unified identity from either of its starting points, so
+ * a food order and a ride agree on the same rider for progress-counting and
+ * credit idempotency.
  *
  * `driverKey` is what DriverIncentiveCredit dedupes on. A linked (unified)
  * rider always resolves to the SAME driverKey regardless of which vertical's
@@ -71,16 +69,14 @@ function windowBoundsFor(rule, at = new Date()) {
  */
 async function resolveDriverContext({ startFrom, id }) {
     let foodPartnerId = null;
-    let qcPartnerId = null;
     let driver = null;
 
     if (startFrom === 'taxiDriver') {
         driver = await Driver.findById(id)
-            .select('workMode legacyDeliveryPartnerId legacyQcPartnerId')
+            .select('workMode legacyDeliveryPartnerId')
             .lean();
         if (!driver) return null;
         foodPartnerId = driver.legacyDeliveryPartnerId || null;
-        qcPartnerId = driver.legacyQcPartnerId || null;
         // Older links point only the other way (partner.driverId). A bike parcel
         // starts here and must still find the Food account, whose delivery
         // wallet is where the food ladder pays.
@@ -89,56 +85,23 @@ async function resolveDriverContext({ startFrom, id }) {
             foodPartnerId = linked?._id || null;
         }
     } else {
-        const PartnerModel = startFrom === 'qcPartner' ? QCDeliveryPartner : FoodDeliveryPartner;
-        const partner = await PartnerModel.findById(id).select('driverId').lean();
+        const partner = await FoodDeliveryPartner.findById(id).select('driverId').lean();
         if (!partner) return null;
-        if (startFrom === 'qcPartner') qcPartnerId = partner._id;
-        else foodPartnerId = partner._id;
+        foodPartnerId = partner._id;
 
         if (partner.driverId) {
             driver = await Driver.findById(partner.driverId)
-                .select('workMode legacyDeliveryPartnerId legacyQcPartnerId')
+                .select('workMode legacyDeliveryPartnerId')
                 .lean();
-            if (driver) {
-                foodPartnerId = foodPartnerId || driver.legacyDeliveryPartnerId || null;
-                qcPartnerId = qcPartnerId || driver.legacyQcPartnerId || null;
-            }
-        }
-    }
-
-    // The Quick & Medical rider record a Food rider delivers those orders as
-    // (core/delivery/qcRiderLink): without it, Medical deliveries made through
-    // the Food app never counted towards the day's ladder.
-    // ...and the other way round: a Medical order completed as the Quick rider
-    // still credits the Food account the delivery app shows.
-    if (qcPartnerId && !foodPartnerId) {
-        try {
-            const { foodRiderIdForQcRider } = await import('../../delivery/qcRiderLink.js');
-            foodPartnerId = (await foodRiderIdForQcRider(qcPartnerId)) || null;
-        } catch {
-            /* no Food account */
-        }
-    }
-    if (foodPartnerId && !qcPartnerId) {
-        try {
-            const { qcRiderIdForFoodRider } = await import('../../delivery/qcRiderLink.js');
-            qcPartnerId = (await qcRiderIdForFoodRider(foodPartnerId)) || null;
-        } catch {
-            /* count Food orders only */
         }
     }
 
     const taxiDriverId = driver?._id || null;
-    const driverKey = taxiDriverId
-        ? `driver:${taxiDriverId}`
-        : foodPartnerId
-            ? `foodPartner:${foodPartnerId}`
-            : `qcPartner:${qcPartnerId}`;
+    const driverKey = taxiDriverId ? `driver:${taxiDriverId}` : `foodPartner:${foodPartnerId}`;
 
     return {
         driverKey,
         foodPartnerId,
-        qcPartnerId,
         taxiDriverId,
         // Only meaningful when a unified driver was actually found — the
         // read path uses it to guess which segment to show before the rider
@@ -328,8 +291,8 @@ export async function segmentOfRide(ride) {
 }
 
 /**
- * The Food/Quick/Medical zone a point is in, for a bike parcel on the food
- * ladder (whose zone ladders are keyed by those zones, not taxi zones).
+ * The Food zone a point is in, for a bike parcel on the food ladder (whose
+ * zone ladders are keyed by food zones, not taxi zones).
  */
 async function deliveryZoneIdAt(coordinates) {
     const [lng, lat] = Array.isArray(coordinates) ? coordinates.map(Number) : [];
@@ -338,29 +301,18 @@ async function deliveryZoneIdAt(coordinates) {
         const { loadActiveZones, resolveZoneIdForPoint } = await import('../../../modules/food/shared/zoneMatching.js');
         const food = resolveZoneIdForPoint(lat, lng, await loadActiveZones());
         if (food) return food;
-        const { findZoneForPoint } = await import('../../../modules/quickCommerce/modules/food/shared/zoneServiceability.js');
-        for (const vertical of ['quick', 'medical']) {
-            // eslint-disable-next-line no-await-in-loop
-            const zone = await findZoneForPoint(lat, lng, vertical);
-            if (zone?._id) return String(zone._id);
-        }
     } catch (err) {
         logger.warn(`incentive: delivery zone lookup failed: ${err.message}`);
     }
     return null;
 }
 
-/** Food/Quick/Medical zone polygons by id, as GeoJSON (they are stored as lat/lng rings). */
+/** Food zone polygons by id, as GeoJSON (they are stored as lat/lng rings). */
 async function deliveryZoneShapes(ids = []) {
     if (!ids.length) return [];
     const { FoodZone } = await import('../../../modules/food/admin/models/zone.model.js');
-    const { zoneModelFor } = await import('../../../modules/quickCommerce/modules/food/shared/zoneServiceability.js');
-    const lists = await Promise.all([
-        FoodZone.find({ _id: { $in: ids } }).select('coordinates').lean().catch(() => []),
-        zoneModelFor('quick').find({ _id: { $in: ids } }).select('coordinates').lean().catch(() => []),
-        zoneModelFor('medical').find({ _id: { $in: ids } }).select('coordinates').lean().catch(() => []),
-    ]);
-    return lists.flat()
+    const zones = await FoodZone.find({ _id: { $in: ids } }).select('coordinates').lean().catch(() => []);
+    return zones
         .map((z) => (Array.isArray(z.coordinates) ? z.coordinates : []))
         .filter((ring) => ring.length >= 3)
         .map((ring) => {
@@ -412,14 +364,6 @@ async function countCompletedToday(ctx, segment, { start, end }, scope = {}) {
             ...zone,
         });
     }
-    if (ctx.qcPartnerId) {
-        total += await QCOrder.countDocuments({
-            'dispatch.deliveryPartnerId': ctx.qcPartnerId,
-            orderStatus: 'delivered',
-            'deliveryState.deliveredAt': { $gte: start, $lte: end },
-            ...zone,
-        });
-    }
     // Bike parcels count with the rider's food, daily-needs and medical orders.
     // Fails soft: a bad zone shape must not take the orders' count down with it.
     if (ctx.taxiDriverId) {
@@ -466,9 +410,7 @@ async function payTierReward({ ctx, rule, tier, completedOrders, periodKey }) {
     // app shows and pays out from. They used to go to the taxi driver wallet
     // for a linked rider, which the delivery app never reads, so the reward
     // was earned but never seen. Taxi & porter rewards stay in the taxi wallet.
-    const deliveryPartnerId = rule.segment === 'foodAndQuick'
-        ? (ctx.foodPartnerId || ctx.qcPartnerId)
-        : null;
+    const deliveryPartnerId = rule.segment === 'foodAndQuick' ? ctx.foodPartnerId : null;
     if (ctx.taxiDriverId && !deliveryPartnerId) {
         await applyDriverWalletAdjustment({
             driverId: ctx.taxiDriverId,
@@ -480,7 +422,7 @@ async function payTierReward({ ctx, rule, tier, completedOrders, periodKey }) {
         return 'taxi_driver_wallet';
     }
 
-    const partnerId = deliveryPartnerId || ctx.foodPartnerId || ctx.qcPartnerId;
+    const partnerId = deliveryPartnerId || ctx.foodPartnerId;
     if (!partnerId) throw new Error('No wallet to credit — rider resolved to neither a driver nor a delivery partner');
 
     // Unique per (day, tier, partner) — via the schema's unique index, a
@@ -592,10 +534,10 @@ async function creditWindow({ ctx, segment, zoneId, vehicleTypeId, windowType })
     }
 }
 
-/** Called after a food or quick-commerce order is marked delivered. */
-export function onFoodOrQuickCommerceOrderCompleted({ deliveryPartnerId, vertical, zoneId = null }) {
+/** Called after a food order is marked delivered. */
+export function onFoodOrQuickCommerceOrderCompleted({ deliveryPartnerId, zoneId = null }) {
     return maybeCreditIncentive({
-        startFrom: vertical === 'quickCommerce' ? 'qcPartner' : 'foodPartner',
+        startFrom: 'foodPartner',
         id: deliveryPartnerId,
         segment: 'foodAndQuick',
         zoneId,
@@ -665,15 +607,9 @@ async function currentZoneOf(ctx, segment) {
         const { taxiZoneIdOfRide } = await import('../../zones/taxiZone.js');
         return taxiZoneIdOfRide(last);
     }
-    const latest = await Promise.all([
-        ctx.foodPartnerId
-            ? FoodOrder.findOne({ 'dispatch.deliveryPartnerId': ctx.foodPartnerId }).sort({ updatedAt: -1 }).select('zoneId updatedAt').lean()
-            : null,
-        ctx.qcPartnerId
-            ? QCOrder.findOne({ 'dispatch.deliveryPartnerId': ctx.qcPartnerId }).sort({ updatedAt: -1 }).select('zoneId updatedAt').lean()
-            : null,
-    ]);
-    const newest = latest.filter(Boolean).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+    const newest = ctx.foodPartnerId
+        ? await FoodOrder.findOne({ 'dispatch.deliveryPartnerId': ctx.foodPartnerId }).sort({ updatedAt: -1 }).select('zoneId updatedAt').lean()
+        : null;
     if (newest?.zoneId) return newest.zoneId;
     // No order to read a zone from -- a new rider, or before the first order
     // of the platform. Every ladder an admin sets is per zone, so without this

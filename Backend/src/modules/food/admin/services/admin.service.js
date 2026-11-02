@@ -1,3 +1,4 @@
+import { config } from '../../../../config/env.js';
 import { safeRiderZoneFilter } from '../../../../core/zones/riderZones.js';
 import mongoose from 'mongoose';
 import { referralSettingsFor } from '../../../../core/referral/referralSettings.service.js';
@@ -3349,7 +3350,7 @@ export async function approveRestaurantAddon(addonId) {
                 {
                     title: 'Addon Approved! âœ…',
                     body: `Your addon "${updated.published?.name || 'New Addon'}" has been approved and is now live.`,
-                    image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: config.brandImageUrl,
                     data: {
                         type: 'addon_approved',
                         addonId: String(updated._id),
@@ -3394,7 +3395,7 @@ export async function rejectRestaurantAddon(addonId, reason) {
                 {
                     title: 'Addon Rejected âŒ',
                     body: `Your addon request for "${updated.draft?.name || 'New Addon'}" was rejected. Reason: ${rejectionReason}`,
-                    image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: config.brandImageUrl,
                     data: {
                         type: 'addon_rejected',
                         addonId: String(updated._id),
@@ -4087,7 +4088,7 @@ export async function approveRestaurant(id) {
                 {
                     title: 'Congratulations! ðŸŽ‰',
                     body: `Your restaurant "${updated.restaurantName}" has been approved. You can now start receiving orders!`,
-                    image: updated.profileImage || 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: updated.profileImage || config.brandImageUrl,
                     data: {
                         type: 'restaurant_approved',
                         restaurantId: String(updated._id)
@@ -4136,7 +4137,7 @@ export async function rejectRestaurant(id, reason) {
                 {
                     title: 'Update on Registration ðŸ“‹',
                     body: `Your restaurant registration for "${updated.restaurantName}" has been rejected. Reason: ${reason || 'Incomplete documents'}.`,
-                    image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: config.brandImageUrl,
                     data: {
                         type: 'restaurant_rejected',
                         restaurantId: String(updated._id),
@@ -4232,7 +4233,7 @@ export async function createAdminOffer(body) {
                 {
                     title: 'New Campaign Invitation! ðŸ“¢',
                     body: `You have been invited to join a new campaign: "${doc.couponCode}". Check it out now!`,
-                    image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: config.brandImageUrl,
                     data: {
                         type: 'campaign_invitation',
                         offerId: String(doc._id),
@@ -4637,7 +4638,7 @@ export async function addDeliveryPartnerBonus(body, adminUser) {
             {
                 title: 'Bonus Credited! ðŸŽŠ',
                 body: `You have received a bonus of \u20B9${body.amount}. ${body.reference || 'Great job!'}`,
-                image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                image: config.brandImageUrl,
                 data: {
                     type: 'bonus_credited',
                     amount: String(body.amount),
@@ -5006,7 +5007,7 @@ export async function creditEarningAddonHistory(historyId, notes) {
             {
                 title: 'Incentive Credited! ðŸŽ¯',
                 body: `Your incentive for "${doc.offerId?.title || 'Earning Addon'}" has been approved and moved to your pocket.`,
-                image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                image: config.brandImageUrl,
                 data: {
                     type: 'incentive_credited',
                     historyId: String(doc._id),
@@ -5038,7 +5039,7 @@ export async function cancelEarningAddonHistory(historyId, reason) {
             {
                 title: 'Incentive Update ðŸ“‹',
                 body: `Your incentive request for "${doc.offerId?.title || 'Earning Addon'}" was not approved. Reason: ${doc.cancelReason || 'Ineligible'}`,
-                image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                image: config.brandImageUrl,
                 data: {
                     type: 'incentive_rejected',
                     historyId: String(doc._id),
@@ -5251,8 +5252,8 @@ export async function getDeliverymanReviews(query = {}) {
  *
  * The list's Delete button called an API that did not exist, so nothing ever
  * happened. Deactivated rather than deleted: the wallet, any cash they owe and
- * their order history stay. They go offline on every side (Food, Quick/Medical
- * through the food record, taxi/parcel through the driver record), lose their
+ * their order history stay. They go offline on every side (Food through the
+ * food record, taxi/parcel through the driver record), lose their
  * push tokens, and every app call is refused (auth.middleware).
  */
 export async function deactivateDeliveryPartner(id) {
@@ -5265,8 +5266,7 @@ export async function deactivateDeliveryPartner(id) {
         'dispatch.status': 'accepted',
         orderStatus: { $nin: ['delivered', 'completed', 'rejected'], $not: /^cancel/ },
     });
-    const { foodRiderHasQcJob } = await import('../../../../core/delivery/qcRiderLink.js');
-    if (onFood || await foodRiderHasQcJob(partner._id).catch(() => false)) {
+    if (onFood) {
         throw new ValidationError('This rider is carrying an order. Reassign or finish it before deactivating them.');
     }
 
@@ -5280,16 +5280,13 @@ export async function deactivateDeliveryPartner(id) {
         const { Driver } = await import('../../../taxi/driver/models/Driver.js');
         await Driver.updateOne({ _id: partner.driverId }, { $set: { isOnline: false, approve: false } }).catch(() => {});
     }
-    const { syncQcRiderFromFood } = await import('../../../../core/delivery/qcRiderLink.js');
-    await syncQcRiderFromFood(String(partner._id), { availabilityStatus: 'offline', status: 'deactivated' }).catch(() => {});
-
     return { _id: partner._id, status: partner.status };
 }
 
 /**
  * "Delete" on the rider list: removes the rider for good.
  *
- * Deleted: the Food rider, its Quick copy, its taxi driver record and hub
+ * Deleted: the Food rider, its taxi driver record and hub
  * profile, its wallet records and its logins. A rider who signs up again on
  * the same number starts as a brand-new account with nothing carried over.
  *
@@ -5313,8 +5310,7 @@ export async function deleteDeliveryPartnerPermanently(id, { force = false, skip
             'dispatch.status': 'accepted',
             orderStatus: { $nin: ['delivered', 'completed', 'rejected'], $not: /^cancel/ },
         });
-        const { foodRiderHasQcJob } = await import('../../../../core/delivery/qcRiderLink.js');
-        if (onFood || await foodRiderHasQcJob(partner._id).catch(() => false)) {
+        if (onFood) {
             throw new ValidationError('This rider is carrying an order. Reassign or finish it before deleting them.');
         }
     }
@@ -5332,12 +5328,6 @@ export async function deleteDeliveryPartnerPermanently(id, { force = false, skip
     await signOutAccount('DELIVERY_PARTNER', partner._id);
 
     const db = mongoose.connection.db;
-    const last10 = String(partner.phone || '').replace(/\D/g, '').slice(-10);
-    const byPhone = last10 ? [{ phone: { $regex: `${last10}$` } }] : [];
-    const qcIds = (await db.collection('qc_delivery_partners').find(
-        { $or: [...byPhone, ...(partner.driverId ? [{ driverId: partner.driverId }] : [])] },
-        { projection: { _id: 1 } },
-    ).toArray()).map((q) => q._id);
     const driverIds = (await db.collection('taxidrivers').find(
         { $or: [...(partner.driverId ? [{ _id: partner.driverId }] : []), { legacyDeliveryPartnerId: partner._id }] },
         { projection: { _id: 1 } },
@@ -5346,14 +5336,12 @@ export async function deleteDeliveryPartnerPermanently(id, { force = false, skip
     await Promise.all([
         db.collection('food_delivery_partners').deleteOne({ _id: partner._id }),
         db.collection('food_delivery_wallets').deleteMany({ deliveryPartnerId: partner._id }),
-        qcIds.length ? db.collection('qc_delivery_partners').deleteMany({ _id: { $in: qcIds } }) : null,
-        qcIds.length ? db.collection('qc_delivery_wallets').deleteMany({ deliveryPartnerId: { $in: qcIds } }) : null,
         driverIds.length ? db.collection('taxidrivers').deleteMany({ _id: { $in: driverIds } }) : null,
         db.collection('food_delivery_profiles').deleteMany({
             $or: [{ legacyDeliveryPartnerId: partner._id }, ...(driverIds.length ? [{ driverId: { $in: driverIds } }] : [])],
         }),
     ]);
-    console.info(`[admin] delivery partner ${partner._id} (${partner.name || ''}) permanently deleted; quick copies ${qcIds.length}, taxi records ${driverIds.length}`);
+    console.info(`[admin] delivery partner ${partner._id} (${partner.name || ''}) permanently deleted; taxi records ${driverIds.length}`);
     return { _id: partner._id, deleted: true };
 }
 
@@ -5384,10 +5372,6 @@ export async function approveDeliveryPartner(id, { serviceCapabilities } = {}) {
     partner.rejectedAt = undefined;
     partner.rejectionReason = undefined;
     await partner.save();
-    {
-        const { syncQcRiderFromFood } = await import('../../../../core/delivery/qcRiderLink.js');
-        await syncQcRiderFromFood(String(partner._id), { status: 'approved' }).catch(() => {});
-    }
 
     try {
         const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
@@ -5396,7 +5380,7 @@ export async function approveDeliveryPartner(id, { serviceCapabilities } = {}) {
             {
                 title: 'Welcome Aboard! ðŸš²',
                 body: `Your delivery partner application has been approved. You can now go online and start earning!`,
-                image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                image: config.brandImageUrl,
                 data: {
                     type: 'onboarding_approved',
                     partnerId: String(partner._id)
@@ -5489,10 +5473,6 @@ export async function rejectDeliveryPartner(id, reason) {
         // Out at once: no new tokens from the refresh token, and the per-request
         // check (core/auth/auth.middleware.js) stops using its cached "approved".
         await signOutAccount('DELIVERY_PARTNER', updated._id);
-        {
-            const { syncQcRiderFromFood } = await import('../../../../core/delivery/qcRiderLink.js');
-            await syncQcRiderFromFood(String(updated._id), { availabilityStatus: 'offline', status: 'rejected' }).catch(() => {});
-        }
         try {
             const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
             await notifyOwnerSafely(
@@ -5500,7 +5480,7 @@ export async function rejectDeliveryPartner(id, reason) {
                 {
                     title: 'Onboarding Update ðŸ“‹',
                     body: `Your application to join as a delivery partner was rejected. Reason: ${reason || 'Incomplete documents'}.`,
-                    image: 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: config.brandImageUrl,
                     data: {
                         type: 'onboarding_rejected',
                         partnerId: String(updated._id),
@@ -6004,10 +5984,8 @@ export async function getCashLimitSettlements(query = {}) {
 }
 
 /**
- * Totals for the Master menu. Food, Quick and Medical share one rider pool
- * (every rider signs up and works on the Food record; Quick keeps linked
- * copies), so riders are counted once, from Food. Taxi drivers are their own
- * pool. Customers are one collection for every app.
+ * Totals for the Master menu. Riders are counted from the Food record (every
+ * rider signs up and works on it). Taxi drivers are their own pool. Customers are one collection for every app.
  */
 async function masterMenuCounts() {
     try {

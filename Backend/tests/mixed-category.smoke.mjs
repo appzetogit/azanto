@@ -7,7 +7,6 @@
  *    put veg dishes in a Mixed category. It cannot add a non-veg dish anywhere.
  *  - A regular restaurant can use all three, with each category still limited
  *    to its own diet type.
- *  - Both the Food and Quick-commerce copies behave the same.
  */
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
@@ -30,7 +29,6 @@ const rejects = (p) => p.then(() => null, (e) => e);
 
 const VERTICALS = [
     ['food', '../src/modules/food'],
-    ['quick-commerce', '../src/modules/quickCommerce/modules/food'],
 ];
 
 const main = async () => {

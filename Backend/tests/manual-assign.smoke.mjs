@@ -3,10 +3,10 @@
  *
  * Run: node tests/manual-assign.smoke.mjs
  *
- * Covers both verticals: the candidate list (nearest first, with online /
- * on-a-trip / cash flags), the refusals, the confirm-before-assigning warnings,
- * assignment (Quick stores the linked Quick rider id), auto-dispatch leaving an
- * admin's pick alone, the rider seeing and accepting it (busy-lock claimed,
+ * Food only (quick commerce is gone, and asking for it is refused): the
+ * candidate list (nearest first, with online / on-a-trip / cash flags), the
+ * refusals, the confirm-before-assigning warnings, assignment, auto-dispatch
+ * leaving an admin's pick alone, the rider seeing and accepting it (busy-lock claimed,
  * deadline cleared), decline, expiry and unassign -- each of the last three
  * putting the order back into auto-dispatch.
  */
@@ -30,16 +30,11 @@ const oid = () => new mongoose.Types.ObjectId();
 
 const { FoodDeliveryPartner: FoodRider } = await import('../src/modules/food/delivery/models/deliveryPartner.model.js');
 const { FoodOrder } = await import('../src/modules/food/orders/models/order.model.js');
-const { FoodOrder: QcOrder } = await import('../src/modules/quickCommerce/modules/food/orders/models/order.model.js');
 const { FoodRestaurant } = await import('../src/modules/food/restaurant/models/restaurant.model.js');
-const { FoodRestaurant: QcStore } = await import('../src/modules/quickCommerce/modules/food/restaurant/models/restaurant.model.js');
 const { Driver } = await import('../src/modules/taxi/driver/models/Driver.js');
-const link = await import('../src/core/delivery/qcRiderLink.js');
 const manual = await import('../src/core/delivery/manualAssign.js');
 const foodDispatch = await import('../src/modules/food/orders/services/order-dispatch.service.js');
-const qcDispatch = await import('../src/modules/quickCommerce/modules/food/orders/services/order-dispatch.service.js');
 const foodDelivery = await import('../src/modules/food/orders/services/order-delivery.service.js');
-const qcDelivery = await import('../src/modules/quickCommerce/modules/food/orders/services/order-delivery.service.js');
 const foodCtrl = await import('../src/modules/food/orders/controllers/order.controller.js');
 const { manualAssignControllers } = await import('../src/core/delivery/manualAssign.controller.js');
 
@@ -57,15 +52,12 @@ const STORE = [75.88, 22.72];
 const { insertedId: restaurantId } = await FoodRestaurant.collection.insertOne({
   restaurantName: 'Smoke Kitchen', status: 'approved', location: { type: 'Point', coordinates: STORE }, createdAt: new Date(),
 });
-const { insertedId: storeId } = await QcStore.collection.insertOne({
-  restaurantName: 'Smoke Mart', status: 'approved', location: { type: 'Point', coordinates: STORE }, createdAt: new Date(),
-});
 
 let seq = 9300000000;
 const driverFor = (balance = 0) => Driver.create({
   name: 'D', phone: `+91${seq++}`, password: 'secret123', vehicleType: 'bike',
   location: { type: 'Point', coordinates: STORE }, workMode: 'all',
-  serviceCapabilities: ['delivery', 'quickCommerce'], wallet: { balance, isBlocked: false },
+  serviceCapabilities: ['delivery'], wallet: { balance, isBlocked: false },
 });
 const rider = async (name, { at = null, online = true, status = 'approved', driver = null } = {}) => FoodRider.create({
   name, phone: String(seq++), status, availabilityStatus: online ? 'online' : 'offline',
@@ -96,21 +88,7 @@ const foodOrder = async (extra = {}) => {
   });
   return String(insertedId);
 };
-const qcOrder = async (extra = {}) => {
-  n += 1;
-  const { insertedId } = await QcOrder.collection.insertOne({
-    order_id: `QC-77000${n}`, orderStatus: 'preparing', restaurantId: storeId, userId: oid(),
-    items: [{ itemId: oid(), name: 'Milk', price: 60, quantity: 1 }],
-    pricing: { subtotal: 60, deliveryFee: 20, total: 80 }, riderEarning: 20,
-    payment: { method: 'razorpay', status: 'paid' },
-    dispatch: { status: 'unassigned', offeredTo: [] }, statusHistory: [],
-    deliveryAddress: { street: '2 MG Road', city: 'Indore', state: 'MP', location: { type: 'Point', coordinates: [75.87, 22.71] } },
-    createdAt: new Date(), updatedAt: new Date(), ...extra,
-  });
-  return String(insertedId);
-};
 const foodRow = (id) => FoodOrder.collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
-const qcRow = (id) => QcOrder.collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
 const admin = { id: String(oid()), name: 'Ops Priya' };
 
 // Farid is on a Food delivery right now.
@@ -160,13 +138,11 @@ await check('an order a rider already accepted is refused', async () => {
   const id = await foodOrder({ dispatch: { status: 'accepted', deliveryPartnerId: F._id, acceptedAt: new Date(), offeredTo: [] } });
   await assert.rejects(() => manual.assignRider({ vertical: 'food', orderId: id, foodRiderId: String(A._id), admin, force: true }), /already accepted/);
 });
-await check('a Medical order whose bill the customer has not accepted is refused', async () => {
-  const id = await qcOrder({
-    order_id: 'MED-7700001', prescriptionOnly: true, payment: { method: 'cash', status: 'cod_pending' },
-    prescription: { required: true, status: 'approved', bill: { status: 'submitted', amount: 60 } },
-  });
-  await assert.rejects(() => manual.assignRider({ vertical: 'quickCommerce', orderId: id, foodRiderId: String(A._id), admin, force: true }), /not approved the bill/);
-  assert.equal((await qcRow(id)).dispatch.status, 'unassigned');
+await check('the removed quick-commerce vertical is refused', async () => {
+  const id = await foodOrder();
+  await assert.rejects(() => manual.assignRider({ vertical: 'quickCommerce', orderId: id, foodRiderId: String(A._id), admin, force: true }), /Unknown vertical/);
+  await assert.rejects(() => manual.listRiderCandidates({ vertical: 'quickCommerce', orderId: id }), /Unknown vertical/);
+  assert.equal((await foodRow(id)).dispatch.status, 'unassigned');
 });
 await check('an unapproved rider is refused', async () => {
   const id = await foodOrder();
@@ -323,83 +299,6 @@ await check('an expiry that lost the race to an accept leaves the accept alone',
     { $set: { 'dispatch.manualDeadlineAt': new Date(Date.now() - 1000), 'dispatch.status': 'accepted', 'dispatch.acceptedAt': new Date() } });
   assert.equal((await manual.expireManualAssignments()).food, 0);
   assert.equal((await foodRow(id)).dispatch.status, 'accepted');
-});
-
-// ---- Quick & Medical -------------------------------------------------------
-console.log('\nQuick & Medical');
-const q1 = await qcOrder();
-await check('assign stores the linked Quick rider id', async () => {
-  const qcIdB = await link.qcRiderIdForFoodRider(String(B._id));
-  // Bala is cash heavy, but this order is prepaid: no warnings.
-  const out = await manual.assignRider({ vertical: 'quickCommerce', orderId: q1, foodRiderId: String(B._id), admin });
-  assert.equal(out.needsConfirmation, false, JSON.stringify(out.warnings));
-  assert.equal(out.assignedRider.partnerId, qcIdB);
-  const row = await qcRow(q1);
-  assert.equal(row.dispatch.status, 'assigned');
-  assert.equal(String(row.dispatch.deliveryPartnerId), qcIdB);
-  assert.equal(row.dispatch.assignMode, 'manual');
-});
-await check('Quick auto-dispatch leaves it alone inside the window', async () => {
-  await QcOrder.collection.updateOne({ _id: new mongoose.Types.ObjectId(q1) },
-    { $set: { 'dispatch.assignedAt': new Date(Date.now() - 120000) } });
-  assert.ok((await qcDispatch.tryAutoAssign(q1)) === null, 'auto-dispatch claimed the order');
-  assert.equal((await qcRow(q1)).dispatch.status, 'assigned');
-});
-await check('the rider sees it and accepts through the FOOD endpoint; lock claimed, deadline cleared', async () => {
-  const qcIdB = await link.qcRiderIdForFoodRider(String(B._id));
-  const list = await qcDelivery.listOrdersAvailableDelivery(qcIdB, {});
-  assert.ok(list.data.some((o) => String(o._id) === q1), 'in the Quick available list');
-  const out = await new Promise((resolve) => {
-    const res = { status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); return this; } };
-    foodCtrl.acceptOrderDeliveryController({ params: { orderId: q1 }, user: { userId: String(B._id), role: 'DELIVERY_PARTNER' }, body: {} }, res,
-      (err) => resolve({ code: err?.statusCode || 500, body: { message: err?.message } }));
-  });
-  assert.equal(out.code, 200, JSON.stringify(out.body).slice(0, 300));
-  const row = await qcRow(q1);
-  assert.equal(row.dispatch.status, 'accepted');
-  assert.ok(!row.dispatch.manualDeadlineAt);
-  const d = await Driver.findById(dB._id).lean();
-  assert.ok((d.activeAssignments || []).some((a) => String(a.jobId) === q1), JSON.stringify(d.activeAssignments));
-});
-await check('a Medical order with its bill approved can be assigned', async () => {
-  const id = await qcOrder({
-    order_id: 'MED-7700002', prescriptionOnly: true, payment: { method: 'cash', status: 'cod_pending' },
-    prescription: { required: true, status: 'approved', bill: { status: 'approved', amount: 60 } },
-  });
-  const out = await manual.assignRider({ vertical: 'quickCommerce', orderId: id, foodRiderId: String(E._id), admin, force: true });
-  assert.equal(out.needsConfirmation, false);
-  assert.equal((await qcRow(id)).dispatch.status, 'assigned');
-});
-await check('Quick decline through the Food reject endpoint: unassigned and noted', async () => {
-  const id = await qcOrder();
-  await manual.assignRider({ vertical: 'quickCommerce', orderId: id, foodRiderId: String(E._id), admin, force: true });
-  const out = await new Promise((resolve) => {
-    const res = { status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); return this; } };
-    foodCtrl.rejectOrderDeliveryController({ params: { orderId: id }, user: { userId: String(E._id), role: 'DELIVERY_PARTNER' }, body: { reason: 'Too far' } }, res,
-      (err) => resolve({ code: err?.statusCode || 500, body: { message: err?.message } }));
-  });
-  assert.equal(out.code, 200, JSON.stringify(out.body).slice(0, 300));
-  const row = await qcRow(id);
-  assert.equal(row.dispatch.status, 'unassigned');
-  assert.equal(row.dispatch.assignMode, 'auto');
-  assert.ok(row.statusHistory.some((h) => h.note === 'Declined by Esha: Too far'), JSON.stringify(row.statusHistory));
-});
-await check('Quick unassign marks the rider deassigned; Quick expiry works too', async () => {
-  const id = await qcOrder();
-  await manual.assignRider({ vertical: 'quickCommerce', orderId: id, foodRiderId: String(E._id), admin, force: true });
-  await manual.unassignRider({ vertical: 'quickCommerce', orderId: id, admin });
-  const row = await qcRow(id);
-  assert.equal(row.dispatch.status, 'unassigned');
-  const qcIdE = await link.qcRiderIdForFoodRider(String(E._id));
-  assert.equal(row.dispatch.offeredTo.find((o) => String(o.partnerId) === qcIdE).action, 'deassigned');
-
-  const id2 = await qcOrder();
-  await manual.assignRider({ vertical: 'quickCommerce', orderId: id2, foodRiderId: String(E._id), admin, force: true });
-  await QcOrder.collection.updateOne({ _id: new mongoose.Types.ObjectId(id2) },
-    { $set: { 'dispatch.manualDeadlineAt': new Date(Date.now() - 1000) } });
-  const r = await manual.expireManualAssignments();
-  assert.equal(r.quickCommerce, 1);
-  assert.equal((await qcRow(id2)).dispatch.status, 'unassigned');
 });
 
 await wait(500);

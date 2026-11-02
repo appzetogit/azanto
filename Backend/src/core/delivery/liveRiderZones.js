@@ -1,12 +1,12 @@
 /**
- * Zones for the Live Drivers filter: every active taxi, food and quick zone,
+ * Zones for the Live Drivers filter: every active taxi and food zone,
  * and which of them a position falls inside.
  *
  * A rider has no home zone, so "in Palampur" means their current position is
  * inside the Palampur zone. The test runs here in plain JS rather than as one
  * $geoIntersects query per zone: there are a handful of zones and a few dozen
  * riders, and the three zone families store their shapes differently (taxi as
- * GeoJSON `geometry`, food and quick as a [{latitude, longitude}] ring or a
+ * GeoJSON `geometry`, food as a [{latitude, longitude}] ring or a
  * circle).
  */
 import { logger } from '../../utils/logger.js';
@@ -87,12 +87,6 @@ export async function loadLiveRiderZones() {
                 .select('name zoneName boundary_mode circle_center circle_radius_meters coordinates')
                 .lean();
         }],
-        ['quick', 'Quick', async () => {
-            const { zoneModelFor } = await import('../../modules/quickCommerce/modules/food/shared/zoneServiceability.js');
-            return zoneModelFor('quick').find({ isActive: { $ne: false } })
-                .select('name zoneName boundary_mode circle_center circle_radius_meters coordinates')
-                .lean();
-        }],
     ];
 
     const zones = [];
@@ -114,6 +108,6 @@ export async function loadLiveRiderZones() {
             logger.warn(`liveRiderZones: ${key} zones failed to load: ${err.message}`);
         }
     }));
-    const order = { Taxi: 0, Food: 1, Quick: 2 };
+    const order = { Taxi: 0, Food: 1 };
     return zones.sort((a, b) => order[a.kind] - order[b.kind] || a.name.localeCompare(b.name));
 }

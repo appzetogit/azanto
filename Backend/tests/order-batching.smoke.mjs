@@ -19,18 +19,16 @@ const db = mongoose.connection.db;
 const oid = () => new mongoose.Types.ObjectId();
 const { FoodDeliveryPartner } = await import('../src/modules/food/delivery/models/deliveryPartner.model.js');
 const { FoodOrder } = await import('../src/modules/food/orders/models/order.model.js');
-const { FoodOrder: QcOrder } = await import('../src/modules/quickCommerce/modules/food/orders/models/order.model.js');
 const batching = await import('../src/core/delivery/batching.js');
 const config = await import('../src/core/config/resolver.service.js');
 
 // Two stores 300 m apart in Indore, a third 4 km away.
-const storeA = oid(); const storeB = oid(); const storeFar = oid(); const pharmacy = oid();
+const storeA = oid(); const storeB = oid(); const storeFar = oid();
 await db.collection('food_restaurants').insertMany([
   { _id: storeA, restaurantName: 'A', location: { type: 'Point', coordinates: [75.8800, 22.7200] } },
   { _id: storeB, restaurantName: 'B', location: { type: 'Point', coordinates: [75.8829, 22.7200] } },
   { _id: storeFar, restaurantName: 'Far', location: { type: 'Point', coordinates: [75.9200, 22.7200] } },
 ]);
-await db.collection('qc_restaurants').insertOne({ _id: pharmacy, restaurantName: 'Med', location: { type: 'Point', coordinates: [75.8805, 22.7203] } });
 const drop = (lng, lat) => ({ location: { type: 'Point', coordinates: [lng, lat] } });
 
 const rider = await FoodDeliveryPartner.create({ name: 'R', phone: '9500000001', status: 'approved' });
@@ -42,7 +40,6 @@ const first = (await FoodOrder.collection.insertOne({
 const near = { _id: oid(), restaurantId: storeB, deliveryAddress: drop(75.8910, 22.7310) };
 const farDrop = { _id: oid(), restaurantId: storeB, deliveryAddress: drop(75.9500, 22.8000) };
 const farStore = { _id: oid(), restaurantId: storeFar, deliveryAddress: drop(75.8910, 22.7310) };
-const medical = { _id: oid(), restaurantId: pharmacy, deliveryAddress: drop(75.8905, 22.7305) };
 
 await check('batching off: a rider on a trip gets no second order; a free rider still does', async () => {
   const v = await batching.canAddToTrip({ foodRiderId: rider._id, order: near, vertical: 'food' });
@@ -61,8 +58,12 @@ await check('batching on: nearby store and drop join the trip', async () => {
   assert.equal((await batching.foodRidersBlockedFor([rider._id], near, 'food')).size, 0);
 });
 
-await check('a Medical order from a store next door joins a Food trip', async () => {
-  assert.equal((await batching.canAddToTrip({ foodRiderId: rider._id, order: medical, vertical: 'quickCommerce' })).ok, true);
+await check('a row left in the removed qc_orders does not make a rider busy', async () => {
+  await db.collection('qc_orders').insertOne({
+    _id: oid(), orderStatus: 'preparing', restaurantId: storeA, deliveryAddress: drop(75.8900, 22.7300),
+    dispatch: { status: 'accepted', deliveryPartnerId: free._id, acceptedAt: new Date() }, createdAt: new Date(),
+  });
+  assert.deepEqual(await batching.canAddToTrip({ foodRiderId: free._id, order: near, vertical: 'food' }), { ok: true, batched: false });
 });
 
 await check('too far apart: drop or store', async () => {

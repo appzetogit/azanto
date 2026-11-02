@@ -1,23 +1,17 @@
 /**
  * Master > Delivery Radius, zone by zone: how far a store in a zone delivers.
  *
- * One number per zone per service (food, quick, medical). The zone is drawn
- * big -- a whole town -- and the radius decides each store's reach inside it:
- * a customer must be in the zone AND within this many km of the store.
+ * One number per zone (food). The zone is drawn big -- a whole town -- and the
+ * radius decides each restaurant's reach inside it: a customer must be in the
+ * zone AND within this many km of the restaurant.
  *
- *  - Quick and Medical stores have no radius of their own; the zone's is
- *    theirs. Unset means no distance limit (only the zone), as before.
- *  - Food restaurants each keep their own radius (food/shared/serviceRadius.js,
- *    enforced there). Saving a food zone's radius applies it to every
- *    restaurant in the zone, which the admin can then adjust one by one.
- *
- * Distance is a straight line here. Quick and Medical never measured road
- * distance, and a straight line can only be shorter than the road, so no store
- * is ever cut off that the road would have allowed.
+ * Food restaurants each keep their own radius (food/shared/serviceRadius.js,
+ * enforced there). Saving a food zone's radius applies it to every restaurant
+ * in the zone, which the admin can then adjust one by one.
  */
 import mongoose from 'mongoose';
 
-export const ZONE_RADIUS_VERTICALS = Object.freeze(['food', 'quick', 'medical']);
+export const ZONE_RADIUS_VERTICALS = Object.freeze(['food']);
 export const ZONE_RADIUS_LIMITS = Object.freeze({ MIN_KM: 0.5, MAX_KM: 100 });
 
 const schema = new mongoose.Schema(
@@ -99,71 +93,13 @@ export async function filterStoresByZoneRadius(vertical, stores = [], point) {
     return stores.filter((s) => judgeStoreDistance(s, point, map).ok);
 }
 
-/** Throws a customer-facing reason when the store does not reach the point. */
-export async function assertStoreReachesPoint(vertical, store, point) {
-    const map = await zoneRadiusMap(vertical).catch(() => new Map());
-    const verdict = judgeStoreDistance(store, point, map);
-    if (!verdict.ok) {
-        throw new ZoneRadiusError(
-            `${store?.restaurantName || 'This store'} delivers within ${verdict.limitKm} km, and this address is `
-            + `${verdict.distanceKm} km away. Choose a store closer to you.`,
-        );
-    }
-    return verdict;
-}
-
-/**
- * Ids of the Quick or Medical stores whose zone radius does not reach this
- * point, for listings to leave out with `_id: { $nin }`. Done as a list of ids
- * rather than a geo clause so it drops into any existing query or $geoNear
- * without a second geo predicate. Empty when no zone of this service has a
- * radius, or there is no point to measure from.
- */
-export async function storesOutOfReach(vertical, point) {
-    if (vertical === 'food') return [];
-    const lat = Number(point?.lat);
-    const lng = Number(point?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
-    const map = await zoneRadiusMap(vertical).catch(() => new Map());
-    if (!map.size) return [];
-    const [{ FoodRestaurant }, { MEDICAL_STORE_TYPE }] = await Promise.all([
-        import('../../modules/quickCommerce/modules/food/restaurant/models/restaurant.model.js'),
-        import('../../modules/quickCommerce/modules/food/shared/storeType.js'),
+async function zonesAndStores() {
+    const [{ FoodZone }, { FoodRestaurant }] = await Promise.all([
+        import('../../modules/food/admin/models/zone.model.js'),
+        import('../../modules/food/restaurant/models/restaurant.model.js'),
     ]);
-    const stores = await FoodRestaurant.find({
-        zoneId: { $in: [...map.keys()].map((id) => new mongoose.Types.ObjectId(id)) },
-        storeType: vertical === 'medical' ? MEDICAL_STORE_TYPE : { $ne: MEDICAL_STORE_TYPE },
-    }).select('zoneId location latitude longitude').lean();
-    return stores.filter((st) => !judgeStoreDistance(st, { lat, lng }, map).ok).map((st) => st._id);
-}
-
-/** Adds `_id $nin out-of-reach` to a Mongo filter without clobbering an `_id` already there. */
-export function excludeIds(filter, ids = []) {
-    if (!ids.length) return filter;
-    const clause = { _id: { $nin: ids } };
-    if (filter._id === undefined) return Object.assign(filter, clause);
-    filter.$and = [...(filter.$and || []), clause];
-    return filter;
-}
-
-async function zonesAndStores(vertical) {
-    if (vertical === 'food') {
-        const [{ FoodZone }, { FoodRestaurant }] = await Promise.all([
-            import('../../modules/food/admin/models/zone.model.js'),
-            import('../../modules/food/restaurant/models/restaurant.model.js'),
-        ]);
-        const zones = await FoodZone.find({}).select('name zoneName isActive').lean();
-        const counts = await FoodRestaurant.aggregate([{ $group: { _id: '$zoneId', n: { $sum: 1 } } }]);
-        return { zones, counts };
-    }
-    const [{ zoneModelFor }, { FoodRestaurant }, { MEDICAL_STORE_TYPE }] = await Promise.all([
-        import('../../modules/quickCommerce/modules/food/shared/zoneServiceability.js'),
-        import('../../modules/quickCommerce/modules/food/restaurant/models/restaurant.model.js'),
-        import('../../modules/quickCommerce/modules/food/shared/storeType.js'),
-    ]);
-    const zones = await zoneModelFor(vertical).find({}).select('name zoneName isActive').lean();
-    const match = vertical === 'medical' ? { storeType: MEDICAL_STORE_TYPE } : { storeType: { $ne: MEDICAL_STORE_TYPE } };
-    const counts = await FoodRestaurant.aggregate([{ $match: match }, { $group: { _id: '$zoneId', n: { $sum: 1 } } }]);
+    const zones = await FoodZone.find({}).select('name zoneName isActive').lean();
+    const counts = await FoodRestaurant.aggregate([{ $group: { _id: '$zoneId', n: { $sum: 1 } } }]);
     return { zones, counts };
 }
 
@@ -171,7 +107,7 @@ async function zonesAndStores(vertical) {
 export async function listZoneRadii(vertical) {
     if (!ZONE_RADIUS_VERTICALS.includes(vertical)) throw new ZoneRadiusError('Unknown service');
     const [{ zones, counts }, rows] = await Promise.all([
-        zonesAndStores(vertical),
+        zonesAndStores(),
         DeliveryZoneRadius.find({ vertical }).lean(),
     ]);
     const byZone = new Map(rows.map((r) => [String(r.zoneId), r]));

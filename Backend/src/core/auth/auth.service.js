@@ -32,7 +32,7 @@ const DEFAULT_CREDENTIALS = {
     .trim()
     .toLowerCase(),
   adminPassword: String(
-    process.env.DEFAULT_ADMIN_PASSWORD || (isDev ? "sahin.Azanto@2004#" : ""),
+    process.env.DEFAULT_ADMIN_PASSWORD || (isDev ? "sahin.Quick Drop@2004#" : ""),
   ),
   userPhone: String(process.env.DEFAULT_USER_PHONE || (isDev ? "7974161582" : "")),
   restaurantPhone: String(process.env.DEFAULT_RESTAURANT_PHONE || (isDev ? "7974161582" : "")),
@@ -377,7 +377,7 @@ export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform
     restaurantDoc = await FoodRestaurant.create({
       restaurantName: "Azanto Demo Restaurant",
       ownerName: "Azanto Restaurant Owner",
-      ownerEmail: "restaurant@Azanto.com",
+      ownerEmail: "restaurant@azanto.com",
       ownerPhone: normalizePhone10(DEFAULT_CREDENTIALS.restaurantPhone),
       primaryContactNumber: normalizePhone10(DEFAULT_CREDENTIALS.restaurantPhone),
       city: "Bhopal",
@@ -810,8 +810,8 @@ export const getProfile = async (userId, role) => {
 
 // Every value the model accepts. This list once lacked serviceProvider, so
 // saving a profile quietly removed that access from the admin. It still lists
-// quickCommerce/medical/serviceProvider although those verticals are switched
-// off: it guards what is stored, and narrowing it would strip them on save.
+// quickCommerce/medical/serviceProvider although those verticals were removed:
+// it guards what is stored, and narrowing it would strip them on save.
 const ADMIN_SERVICES_ALLOWED = ["food", "quickCommerce", "medical", "taxi", "serviceProvider"];
 
 /** Update admin profile (name, email, phone, profileImage). Only for ADMIN role. */

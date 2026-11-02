@@ -89,9 +89,8 @@ export const config = {
     //
     // Food used to push images to Cloudinary. That account is disabled, so every
     // stored delivery URL 401s; local disk is now the store of record.
-    // Must match the nginx `location /uploads/` alias, which already serves
-    // /var/www/uploads/ for quickCommerce. Food now writes into the same root
-    // under its own folder prefix.
+    // Must match the nginx `location /uploads/` alias, which serves
+    // /var/www/uploads/. Food writes into that root under its own folder prefix.
     uploadStorageRoot: process.env.UPLOAD_STORAGE_ROOT
         || (process.env.NODE_ENV === 'production' ? '/var/www/uploads' : 'uploads'),
     /**
@@ -100,6 +99,12 @@ export const config = {
      * against, so a relative prefix renders on the web and breaks in the app.
      */
     uploadBaseUrl: sanitizeUploadBaseUrl(process.env.UPLOAD_BASE_URL) || '/uploads',
+    /**
+     * Image shown on push notifications that have no picture of their own. Absolute,
+     * because the phone fetches it; defaults to the brand icon on the site's own origin.
+     */
+    brandImageUrl: process.env.BRAND_IMAGE_URL
+        || `${parseOrigins(process.env.FRONTEND_URL)[0] || ''}/brand/azanto-icon-512.png`,
     uploadMaxFileSizeBytes: Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 5) * 1024 * 1024,
     /** WebP output quality (1–100). */
     uploadWebpQuality: Number(process.env.UPLOAD_WEBP_QUALITY || 90),

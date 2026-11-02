@@ -481,9 +481,6 @@ export const updateDeliveryAvailability = async (userId, payload) => {
         partner.lastLocationAt = new Date();
     }
     await partner.save();
-    // The same rider takes Quick & Medical orders: keep that record in step.
-    const { syncQcRiderFromFood } = await import('../../../../core/delivery/qcRiderLink.js');
-    void syncQcRiderFromFood(userId, { availabilityStatus: validStatus, lat: latitude, lng: longitude });
     return { availabilityStatus: partner.availabilityStatus };
 };
 
@@ -542,32 +539,6 @@ export const getDeliveryPartnerEarnings = async (deliveryPartnerId, query = {}) 
 
     const foodEarnings = Number(agg?.[0]?.totalEarnings) || 0;
 
-    // Quick & Medical deliveries this rider made through the Food app, as the
-    // linked QC rider record (core/delivery/qcRiderLink). They are stored in
-    // qc_orders, so a Food-only sum left "Today's earning" at 0 after a
-    // Medical delivery.
-    let qcOrders = 0;
-    let qcEarnings = 0;
-    try {
-        const { qcRiderIdForFoodRider } = await import('../../../../core/delivery/qcRiderLink.js');
-        const qcId = await qcRiderIdForFoodRider(partnerId);
-        if (qcId && mongoose.Types.ObjectId.isValid(qcId)) {
-            const { FoodOrder: QcOrder } = await import('../../../quickCommerce/modules/food/orders/models/order.model.js');
-            const qcMatch = { ...match, 'dispatch.deliveryPartnerId': new mongoose.Types.ObjectId(qcId) };
-            const [count, qcAgg] = await Promise.all([
-                QcOrder.countDocuments(qcMatch),
-                QcOrder.aggregate([
-                    { $match: qcMatch },
-                    { $group: { _id: null, total: { $sum: { $ifNull: ['$riderEarning', 0] } } } },
-                ]),
-            ]);
-            qcOrders = count;
-            qcEarnings = Number(qcAgg?.[0]?.total) || 0;
-        }
-    } catch {
-        /* Food figures alone */
-    }
-
     // Target incentives paid in this period (delivery bonuses, transactionId INC-...).
     let incentive = 0;
     try {
@@ -586,9 +557,9 @@ export const getDeliveryPartnerEarnings = async (deliveryPartnerId, query = {}) 
     const rideTrips = await linkedRideTrips(partnerId, range);
     const rideEarnings = rideTrips.reduce((sum, t) => sum + (Number(t.earningAmount) || 0), 0);
 
-    const orderEarning = Math.round((foodEarnings + qcEarnings + rideEarnings) * 100) / 100;
+    const orderEarning = Math.round((foodEarnings + rideEarnings) * 100) / 100;
     const totalEarnings = Math.round((orderEarning + incentive) * 100) / 100;
-    const allOrders = totalOrders + qcOrders + rideTrips.length;
+    const allOrders = totalOrders + rideTrips.length;
 
     // Frontend only strongly relies on totalEarnings + totalOrders.
     const summary = {
@@ -834,41 +805,6 @@ const bonusHistoryRows = async (partnerId, range) => {
     }
 };
 
-/** Quick & Medical deliveries this rider made as their linked QC rider, as trips. */
-const linkedQcTrips = async (partnerId, range = null) => {
-    try {
-        const { qcRiderIdForFoodRider } = await import('../../../../core/delivery/qcRiderLink.js');
-        const qcId = await qcRiderIdForFoodRider(partnerId);
-        if (!qcId || !mongoose.Types.ObjectId.isValid(qcId)) return [];
-        const { FoodOrder: QcOrder } = await import('../../../quickCommerce/modules/food/orders/models/order.model.js');
-        // Registers the store model the populate below needs.
-        await import('../../../quickCommerce/modules/food/restaurant/models/restaurant.model.js');
-        const match = { 'dispatch.deliveryPartnerId': new mongoose.Types.ObjectId(qcId), orderStatus: 'delivered' };
-        if (range) match['deliveryState.deliveredAt'] = { $gte: range.start, $lte: range.end };
-        // The store's name, so history and earnings say which pharmacy/shop
-        // (toTripDto reads restaurantId.restaurantName).
-        const orders = await QcOrder.find(match)
-            .populate({ path: 'restaurantId', select: 'restaurantName storeType' })
-            .sort({ 'deliveryState.deliveredAt': -1 })
-            .limit(1000)
-            .lean();
-        return orders.map((o) => {
-            const trip = toTripDto(o);
-            const medical = String(o.order_id || '').startsWith('MED-') || o.restaurantId?.storeType === 'pharmacy';
-            // The History screen tags a card by `category` (Medical / Quick
-            // Commerce); without it these showed as Food.
-            const tagged = { ...trip, category: medical ? 'medical' : 'quick_commerce' };
-            if (!trip.restaurantName) {
-                const label = medical ? 'Medical order' : 'Quick order';
-                return { ...tagged, restaurantName: label, restaurant: label };
-            }
-            return tagged;
-        });
-    } catch {
-        return [];
-    }
-};
-
 export const getDeliveryPartnerTripHistory = async (deliveryPartnerId, query = {}) => {
     if (!deliveryPartnerId || !mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
         throw new ValidationError('Delivery partner not found');
@@ -908,14 +844,12 @@ export const getDeliveryPartnerTripHistory = async (deliveryPartnerId, query = {
         .limit(limit)
         .lean();
 
-    // Completed Medical/Quick deliveries and the bonuses credited in the period
-    // belong in history too; a "cancelled" or "pending" filter has none to add.
+    // The bonuses credited in the period belong in history too; a "cancelled" or "pending" filter has none to add.
     // Parcels/rides are NOT added here: the History screen loads them itself
     // from the ride history, and adding them listed every parcel twice.
     const extra = sf === 'cancelled' || sf === 'pending'
         ? []
         : [
-            ...(await linkedQcTrips(partnerId, { start, end })),
             ...(await bonusHistoryRows(partnerId, { start, end })),
         ];
     const trips = [...(orders || []).map(toTripDto), ...extra]
@@ -964,12 +898,8 @@ export const getDeliveryPocketDetails = async (deliveryPartnerId, query = {}) =>
         .limit(limit)
         .lean();
 
-    // Medical/Quick deliveries and bike parcels count in the week too.
-    const [qcTrips, rideTrips] = await Promise.all([
-        linkedQcTrips(partnerId, { start, end }),
-        linkedRideTrips(partnerId, { start, end }),
-    ]);
-    const extraTrips = [...qcTrips, ...rideTrips];
+    // Bike parcels count in the week too.
+    const extraTrips = await linkedRideTrips(partnerId, { start, end });
 
     const trips = [...(orders || []).map(toTripDto), ...extraTrips]
         .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));

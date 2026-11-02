@@ -4,7 +4,8 @@
  * Run: node tests/home-content.smoke.mjs
  *
  * What this guards:
- *   - the five sets the app shows are listed, from their own collections;
+ *   - the two sets the app shows are listed, from their own collections; the
+ *     quick-commerce sets are gone, so rows left in their collections are not;
  *   - section header artwork is split by section, and an empty section still
  *     appears (the app shows a flat colour there);
  *   - live / scheduled / ended / paused are right, and zones are named;
@@ -53,6 +54,7 @@ await db.collection('food_home_promotion_banners').insertMany([
   { _id: oid(), imageUrl: 'https://x/p2.jpg', title: 'Next week', startDate: new Date(Date.now() + 5 * day), isActive: true },
   { _id: oid(), imageUrl: 'https://x/p3.jpg', title: 'Last month', endDate: new Date(Date.now() - 5 * day), isActive: true },
 ]);
+// Rows left behind by the removed quick-commerce home.
 await db.collection('qc_hero_banners').insertOne({ _id: oid(), imageUrl: 'https://x/q1.jpg', title: 'Fresh fruit', isActive: true });
 const top = oid();
 await db.collection('qc_top_banners').insertOne({ _id: top, image: 'https://x/top.jpg', order: 0, isActive: true });
@@ -64,11 +66,10 @@ const sub = (services, permissions) => ({
 const groupsOf = async (admin = owner) => Object.fromEntries((await content.listHomeContent(admin)).groups.map((g) => [g.key, g]));
 
 console.log('\nThe list');
-await check('the five sets the app shows, from their own collections', async () => {
+await check('the two sets the app shows, from their own collections', async () => {
   const g = await groupsOf();
-  assert.deepEqual(Object.keys(g), ['header', 'foodPromo', 'quickHero', 'quickTop', 'quickPromo']);
-  assert.equal(g.quickTop.items[0].imageUrl, 'https://x/top.jpg');
-  assert.equal(g.quickTop.editPath, null);
+  assert.deepEqual(Object.keys(g), ['header', 'foodPromo']);
+  assert.ok(!Object.values(g).some((grp) => grp.items.some((i) => i.imageUrl === 'https://x/top.jpg' || i.title === 'Fresh fruit')));
 });
 await check('header artwork is split by section; empty sections still listed', async () => {
   const { sections } = (await groupsOf()).header;
@@ -105,15 +106,14 @@ await check('pausing writes the flag the public read filters on, and resuming un
   await content.setHomeContentLive(owner, 'foodPromo', String(promoLive), true);
   assert.equal((await db.collection('food_home_promotion_banners').findOne({ _id: promoLive })).isActive, true);
 });
-await check('Quick top banners pause too', async () => {
-  await content.setHomeContentLive(owner, 'quickTop', String(top), false);
-  assert.equal((await db.collection('qc_top_banners').findOne({ _id: top })).isActive, false);
-  await content.setHomeContentLive(owner, 'quickTop', String(top), true);
+await check('a removed quick-commerce group is not a group any more', async () => {
+  await assert.rejects(() => content.setHomeContentLive(owner, 'quickTop', String(top), false), /Unknown banner group/);
+  assert.equal((await db.collection('qc_top_banners').findOne({ _id: top })).isActive, true);
 });
 await check('bad requests are refused', async () => {
   await assert.rejects(() => content.setHomeContentLive(owner, 'nope', String(top), true), /Unknown banner group/);
-  await assert.rejects(() => content.setHomeContentLive(owner, 'quickTop', String(oid()), true), /not found/);
-  await assert.rejects(() => content.setHomeContentLive(owner, 'quickTop', String(top), 'yes'), /should be live/);
+  await assert.rejects(() => content.setHomeContentLive(owner, 'foodPromo', String(oid()), true), /not found/);
+  await assert.rejects(() => content.setHomeContentLive(owner, 'foodPromo', String(promoLive), 'yes'), /should be live/);
 });
 
 console.log('\nWho sees what');
@@ -122,15 +122,14 @@ await check('a Food banners sub-admin sees only Food\'s sets and can pause them'
   assert.deepEqual(Object.keys(await groupsOf(foodCms)), ['header', 'foodPromo']);
   await content.setHomeContentLive(foodCms, 'header', String(foodHeader), false);
   await content.setHomeContentLive(owner, 'header', String(foodHeader), true);
-  await assert.rejects(() => content.setHomeContentLive(foodCms, 'quickTop', String(top), false), /not change them/);
-  assert.equal(content.canUploadQuickTop(foodCms), false);
 });
-await check('view-only cannot pause or upload', async () => {
-  const viewer = sub(['quickCommerce'], ['cms.read']);
-  assert.deepEqual(Object.keys(await groupsOf(viewer)), ['quickHero', 'quickTop', 'quickPromo']);
-  await assert.rejects(() => content.setHomeContentLive(viewer, 'quickTop', String(top), false), /not change them/);
-  assert.equal(content.canUploadQuickTop(viewer), false);
-  assert.equal(content.canUploadQuickTop(owner), true);
+await check('view-only cannot pause', async () => {
+  const viewer = sub(['food'], ['cms.read']);
+  assert.deepEqual(Object.keys(await groupsOf(viewer)), ['header', 'foodPromo']);
+  await assert.rejects(() => content.setHomeContentLive(viewer, 'foodPromo', String(promoLive), false), /not change them/);
+});
+await check('stored quick-commerce banner access sees nothing', async () => {
+  await assert.rejects(() => content.listHomeContent(sub(['quickCommerce'], ['cms.write'])), /access to banners/);
 });
 await check('no Banners access at all is refused', async () => {
   await assert.rejects(() => content.listHomeContent(sub(['food'], ['orders.read'])), /access to banners/);

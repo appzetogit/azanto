@@ -40,7 +40,7 @@ export default function FAQ({ settings }) {
           {faqs.map((faq, i) => {
             const isOpen = open === i
             return (
-              <div key={faq.question} className="overflow-hidden rounded-2xl bg-white shadow-sm">
+              <div key={i} className="overflow-hidden rounded-2xl bg-white shadow-sm">
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? -1 : i)}

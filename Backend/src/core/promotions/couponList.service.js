@@ -6,17 +6,16 @@ import { resolvePromoCeiling, tighten } from '../finance/promoLimits.service.js'
 /**
  * One list of every coupon on the platform (Master > Coupons).
  *
- * Three systems hold them: Food's food_offers, Quick & Medical's qc_offers and
- * Taxi's promo codes. Their forms differ -- restaurant scope and cost sharing
+ * Two systems hold them: Food's food_offers and Taxi's promo codes. Their forms differ -- restaurant scope and cost sharing
  * in one, service locations and ride types in another -- so creating and
  * editing stay on each service's own screen. What an operator needs in one
  * place is the other half: which codes exist, which are live right now, how
  * far each has been used, and a way to pause one fast.
  *
  * Pausing is the one write, and each service's checkout already honours it:
- * Food and Quick redeem only status 'active' (order-pricing), Taxi only
- * `active: true`. Food and Quick had no pause button at all before this; their
- * admins could only delete a coupon to stop it.
+ * Food redeems only status 'active' (order-pricing), Taxi only
+ * `active: true`. Food had no pause button at all before this; its admins
+ * could only delete a coupon to stop it.
  *
  * Usage limits are shown as ENFORCED: the code's own limit tightened by the
  * Master promo ceiling (promoLimits.service.js), so the number here is the one
@@ -34,13 +33,6 @@ const SOURCES = {
     vertical: 'food',
     load: async () => (await import('../../modules/food/admin/models/offer.model.js')).FoodOffer,
     sellers: 'food_restaurants',
-  },
-  quick: {
-    label: 'Quick & Medical',
-    service: 'quickCommerce',
-    vertical: 'quickCommerce',
-    load: async () => (await import('../../modules/quickCommerce/modules/food/admin/models/offer.model.js')).FoodOffer,
-    sellers: 'qc_restaurants',
   },
   taxi: {
     label: 'Taxi',

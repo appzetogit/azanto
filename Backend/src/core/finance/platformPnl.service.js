@@ -10,7 +10,7 @@ import { decideAdminAccess } from '../admin/adminAccessPolicy.js';
  * this reads those records rather than re-deriving the money, so the figures
  * here are the ones each service's own reports and payouts are built from:
  *
- *   Food, Quick & Medical  food_transactions / qc_transactions, on delivered
+ *   Food                   food_transactions, on delivered
  *                          orders. platformNetProfit is platform fee + delivery
  *                          fee + surge + commission + admin packaging + round-off
  *                          - rider pay - any coupon the platform funded
@@ -20,24 +20,19 @@ import { decideAdminAccess } from '../admin/adminAccessPolicy.js';
  *                          commission + recovered cancellation fees - the promo
  *                          the platform funds - the driver incentive
  *                          (driver/services/walletService.js).
- *   Services               paid vendor bills: companyRevenue less its GST, which
- *                          is the government's (models/VendorBill.js).
  *
  * GST is shown beside the income, never in it: it was collected for the
  * government. Orders are counted by the day they were placed (rides by the day
- * they completed, bills by the day they were paid), in India time.
+ * they completed), in India time.
  *
- * Not included yet: subscription income (Quick seller plans, Services worker
- * plans) and wallet top-ups, which are not per-order money.
+ * Not included yet: wallet top-ups, which are not per-order money.
  */
 
 const TZ = 'Asia/Kolkata';
 
 const SERVICES = {
   food: { label: 'Food', service: 'food', unit: 'orders' },
-  quick: { label: 'Quick & Medical', service: 'quickCommerce', unit: 'orders' },
   taxi: { label: 'Taxi', service: 'taxi', unit: 'rides' },
-  services: { label: 'Services', service: 'serviceProvider', unit: 'bookings' },
 };
 
 const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -64,7 +59,7 @@ const coll = (name) => mongoose.connection.collection(name);
 const dayOf = (field) => ({ $dateToString: { format: '%Y-%m-%d', date: field, timezone: TZ } });
 const num = (path) => ({ $ifNull: [path, 0] });
 
-/* ----------------------------------------------------- Food and Quick */
+/* --------------------------------------------------------------- Food */
 
 async function storeOrders(transactions, orders, { start, end }) {
   const [row] = await coll(transactions)
@@ -171,60 +166,9 @@ async function taxiRides({ start, end }) {
   };
 }
 
-/* ----------------------------------------------------------- Services */
-
-async function serviceBills({ start, end }) {
-  const [row] = await coll('sp_vendor_bills')
-    .aggregate([
-      { $match: { status: 'paid' } },
-      { $addFields: { paidOn: { $ifNull: ['$paidAt', '$updatedAt'] } } },
-      { $match: { paidOn: { $gte: start, $lte: end } } },
-      {
-        $project: {
-          day: dayOf('$paidOn'),
-          gross: num('$grandTotal'),
-          gst: num('$totalGST'),
-          vendor: num('$vendorTotalEarning'),
-          serviceShare: { $subtract: [num('$totalServiceBase'), num('$vendorServiceEarning')] },
-          partsShare: { $subtract: [num('$totalPartsBase'), num('$vendorPartsEarning')] },
-          net: { $subtract: [num('$companyRevenue'), num('$totalGST')] },
-        },
-      },
-      {
-        $facet: {
-          total: [{
-            $group: {
-              _id: null, count: { $sum: 1 }, gross: { $sum: '$gross' }, gst: { $sum: '$gst' }, vendor: { $sum: '$vendor' },
-              serviceShare: { $sum: '$serviceShare' }, partsShare: { $sum: '$partsShare' }, net: { $sum: '$net' },
-            },
-          }],
-          daily: [{ $group: { _id: '$day', net: { $sum: '$net' } } }, { $sort: { _id: 1 } }],
-        },
-      },
-    ])
-    .toArray();
-  const t = row?.total?.[0] || {};
-  const known = (t.serviceShare || 0) + (t.partsShare || 0);
-  return {
-    count: t.count || 0,
-    gross: t.gross || 0,
-    gst: t.gst || 0,
-    partners: t.vendor || 0,
-    net: t.net || 0,
-    lines: [
-      { key: 'serviceShare', label: 'Share of service charges', amount: t.serviceShare || 0 },
-      { key: 'partsShare', label: 'Share of parts', amount: t.partsShare || 0 },
-      { key: 'other', label: 'Visiting and transport charges', amount: (t.net || 0) - known },
-    ],
-    daily: (row?.daily || []).map((d) => ({ date: d._id, net: d.net })),
-  };
-}
-
 const LOADERS = {
   food: (r) => storeOrders('food_transactions', 'food_orders', r),
-  quick: (r) => storeOrders('qc_transactions', 'qc_orders', r),
   taxi: taxiRides,
-  services: serviceBills,
 };
 
 /* ------------------------------------------------------------- report */

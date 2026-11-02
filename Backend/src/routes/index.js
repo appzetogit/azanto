@@ -206,18 +206,13 @@ router.use('/v1/taxi/admin/types/set-prices', setPriceGuard);
 router.use('/v1/taxi', requireModuleEnabled(MODULES.TAXI), taxiRouter);
 
 // ─── Cross-vertical customer feed ──────────────────────────────────────────
-// One customer's history and spend across food, taxi, quick-commerce and
-// service-provider. Mounted at the platform root rather than under any vertical,
+// One customer's history and spend across food and taxi. Mounted at the platform root rather than under any vertical,
 // because it belongs to none of them.
 router.get('/v1/me/activity', authMiddleware, getMyActivityController);
 router.get('/v1/me/spend', authMiddleware, getMySpendController);
 
-// ─── Quick-Commerce and Service-Provider: switched off ─────────────────────
-// The product is food + taxi only, so /v1/qc, /v1/sp and the SP legacy top-level
-// prefixes (/users, /vendors, /workers, /bookings, ...) are no longer mounted and
-// fall through to the 404 handler. The modules themselves stay in the tree for now:
-// about 33 core/* files still import QC models and services (payments webhook,
-// rider finance, manual assign, auth, zones), and removing those is its own change
-// (see modules/quickCommerce/FORK_COLLAPSE.md).
+// The product is food + taxi only. Quick commerce and service-provider were
+// removed, so their old prefixes (/v1/qc, /v1/sp and SP's top-level /users,
+// /vendors, /workers, /bookings, ...) fall through to the 404 handler.
 
 export default router;

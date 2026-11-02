@@ -11,8 +11,7 @@ const storage = multer.memoryStorage();
  * are buffered in memory (memoryStorage), every byte accepted is heap in a
  * process that runs alongside the whole API.
  *
- * 25MB per file matches the quickCommerce copy of this middleware, so one
- * MAX_UPLOAD_BYTES tunes both, and leaves room under nginx's 50M for multipart
+ * 25MB per file (MAX_UPLOAD_BYTES) leaves room under nginx's 50M for multipart
  * framing -- a cap set exactly at the intended file size rejects files that are
  * only just under it.
  *

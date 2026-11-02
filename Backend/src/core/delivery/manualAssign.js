@@ -1,20 +1,9 @@
 import mongoose from 'mongoose';
 import { ValidationError, NotFoundError } from '../auth/errors.js';
 import { logger } from '../../utils/logger.js';
-import {
-  qcRiderIdForFoodRider,
-  foodRiderIdForQcRider,
-  mirrorQcOfferToFoodRider,
-} from './qcRiderLink.js';
 
 /**
- * An admin hands an order to a rider of their choosing.
- *
- * One implementation for Food and for Quick & Medical (vertical 'food' |
- * 'quickCommerce'). The admin always picks a FOOD rider -- the identity the
- * delivery app signs in as -- and for a Quick / Medical order the assignment is
- * stored against the linked Quick rider record (qcRiderLink.js), exactly as the
- * app's own accept does.
+ * An admin hands a Food order to a rider of their choosing (vertical 'food').
  *
  * The life of a manual assignment:
  *
@@ -76,25 +65,9 @@ const loaders = {
       import('../../config/socket.js'),
     ]);
     return {
-      vertical: 'food', isQc: false, Order: FoodOrder, Restaurant: FoodRestaurant,
+      vertical: 'food', Order: FoodOrder, Restaurant: FoodRestaurant,
       helpers, tryAutoAssign: dispatch.tryAutoAssign, socket,
       assertAssignable: () => {},
-    };
-  },
-  quickCommerce: async () => {
-    const [{ FoodOrder }, { FoodRestaurant }, helpers, dispatch, socket, rx] = await Promise.all([
-      import('../../modules/quickCommerce/modules/food/orders/models/order.model.js'),
-      import('../../modules/quickCommerce/modules/food/restaurant/models/restaurant.model.js'),
-      import('../../modules/quickCommerce/modules/food/orders/services/order.helpers.js'),
-      import('../../modules/quickCommerce/modules/food/orders/services/order-dispatch.service.js'),
-      import('../../modules/quickCommerce/config/socket.js'),
-      import('../../modules/quickCommerce/modules/food/shared/prescriptionOrder.js'),
-    ]);
-    return {
-      vertical: 'quickCommerce', isQc: true, Order: FoodOrder, Restaurant: FoodRestaurant,
-      helpers, tryAutoAssign: dispatch.tryAutoAssign, socket,
-      // A Medical order goes to a rider only once the customer has agreed to the bill.
-      assertAssignable: rx.assertDeliveryPartnerAssignable,
     };
   },
 };
@@ -107,8 +80,6 @@ const vertical = async (name) => {
 
 const foodRiderModel = async () =>
   (await import('../../modules/food/delivery/models/deliveryPartner.model.js')).FoodDeliveryPartner;
-const qcRiderModel = async () =>
-  (await import('../../modules/quickCommerce/modules/food/delivery/models/deliveryPartner.model.js')).FoodDeliveryPartner;
 
 /** [lat, lng] of a store, from GeoJSON or the latitude/longitude fields. */
 const pointOf = (location) => {
@@ -154,27 +125,18 @@ const isCashOrder = (order) => {
 };
 
 /**
- * Food rider ids that are on a delivery right now, in either vertical.
+ * Food rider ids that are on a delivery right now.
  *
- * Bounded by the number of live trips, not riders. Quick trips are stored
- * against the Quick rider record and mapped back (cached in qcRiderLink).
+ * Bounded by the number of live trips, not riders.
  */
 export async function foodRidersOnTrip() {
-  const [{ FoodOrder }, { FoodOrder: QcOrder }] = await Promise.all([
-    import('../../modules/food/orders/models/order.model.js'),
-    import('../../modules/quickCommerce/modules/food/orders/models/order.model.js'),
-  ]);
-  const live = {
+  const { FoodOrder } = await import('../../modules/food/orders/models/order.model.js');
+  const foodIds = await FoodOrder.distinct('dispatch.deliveryPartnerId', {
     'dispatch.status': 'accepted',
     'dispatch.deliveryPartnerId': { $ne: null },
     orderStatus: { $nin: TERMINAL_STATUSES },
-  };
-  const [foodIds, qcIds] = await Promise.all([
-    FoodOrder.distinct('dispatch.deliveryPartnerId', live),
-    QcOrder.distinct('dispatch.deliveryPartnerId', live),
-  ]);
-  const mapped = await Promise.all(qcIds.map((id) => foodRiderIdForQcRider(id)));
-  return new Set([...foodIds.map(String), ...mapped.filter(Boolean).map(String)]);
+  });
+  return new Set(foodIds.map(String));
 }
 
 /** Cash in hand and the limit, from the one finance source. Never throws. */
@@ -197,34 +159,19 @@ const breachesCashLimit = ({ cashInHand, cashLimit }, orderCash) =>
 /* Notifications                                                             */
 /* ------------------------------------------------------------------------ */
 
-/** JSON round trip with every Quick rider id replaced by the Food one. */
-const asFoodRider = (value, qcId, foodId) => (value == null || !qcId || !foodId
-  ? value
-  : JSON.parse(JSON.stringify(value).split(String(qcId)).join(String(foodId))));
-
 /**
  * A socket event (and optionally a data-only push) to riders named by the id
- * the order stores. A Quick id also reaches the Food identity the app runs as.
- * Never throws.
+ * the order stores. Never throws.
  */
 async function toRiders(ctx, partnerIds, event, payload, { push } = {}) {
   const ids = [...new Set((partnerIds || []).filter(Boolean).map(String))];
   if (!ids.length) return;
   try {
     const io = ctx.socket.getIO?.();
-    const foodSocket = ctx.isQc ? await import('../../config/socket.js') : ctx.socket;
-    const foodIo = foodSocket.getIO?.();
     const pushTargets = [];
     for (const id of ids) {
       if (io) io.to(ctx.socket.rooms.delivery(id)).emit(event, payload);
       pushTargets.push({ ownerType: 'DELIVERY_PARTNER', ownerId: id });
-      if (ctx.isQc) {
-        // eslint-disable-next-line no-await-in-loop
-        const foodId = await foodRiderIdForQcRider(id);
-        if (!foodId) continue;
-        if (foodIo) foodIo.to(foodSocket.rooms.delivery(foodId)).emit(event, asFoodRider(payload, id, foodId));
-        pushTargets.push({ ownerType: 'DELIVERY_PARTNER', ownerId: foodId });
-      }
     }
     if (push) await ctx.helpers.notifyOwnersSafely(pushTargets, { ...push, dataOnly: true });
   } catch (err) {
@@ -285,10 +232,6 @@ function tellRiderDeassigned(ctx, order, partnerId, reason, message) {
   });
 }
 
-/** The rider id the admin panel and the app know: the Food one. */
-const appRiderId = async (ctx, partnerId) =>
-  (ctx.isQc ? (await foodRiderIdForQcRider(partnerId)) || String(partnerId) : String(partnerId));
-
 const restartDispatch = (ctx, orderId) => {
   void Promise.resolve()
     .then(() => ctx.tryAutoAssign(orderId))
@@ -342,9 +285,7 @@ export async function listRiderCandidates({ vertical: name, orderId, q = '', lim
     Promise.all(page.map(({ r }) => riderCash(r._id))),
   ]);
 
-  const assignedFoodId = order.dispatch?.deliveryPartnerId
-    ? (ctx.isQc ? await foodRiderIdForQcRider(order.dispatch.deliveryPartnerId) : String(order.dispatch.deliveryPartnerId))
-    : null;
+  const assignedFoodId = order.dispatch?.deliveryPartnerId ? String(order.dispatch.deliveryPartnerId) : null;
 
   return {
     order: {
@@ -426,12 +367,71 @@ async function warningsFor({ order, foodRider, store }) {
   return warnings;
 }
 
+const fcmString = (v) => (v === undefined || v === null ? '' : String(v));
+
+/**
+ * Product thumbnails for the alert card, as a JSON string: at most 4, and the
+ * images dropped if that still exceeds 1 KB (FCM data has a 4 KB ceiling, and
+ * truncated JSON would stop the card rendering at all).
+ */
+function pushItems(items) {
+  const list = Array.isArray(items) ? items.slice(0, 4) : [];
+  if (list.length === 0) return '[]';
+  const withImages = list.map((i) => ({
+    name: String(i?.name || ''),
+    quantity: Number(i?.quantity || 1),
+    image: String(i?.image || ''),
+  }));
+  const encoded = JSON.stringify(withImages);
+  if (Buffer.byteLength(encoded, 'utf8') <= 1024) return encoded;
+  return JSON.stringify(withImages.map(({ image, ...rest }) => rest));
+}
+
+/**
+ * The incoming-order map the rider app draws its full-screen alert from, with
+ * no follow-up call. Every value is a string because FCM data may hold nothing
+ * else. (This used to be borrowed from quick commerce's dispatcher, which
+ * labelled every card jobType 'quick_commerce'; it is food's alone now.)
+ */
+function incomingOrderPushData(order, payload, deadline) {
+  const s = fcmString;
+  return {
+    type: 'new_order',
+    jobType: 'food',
+    orderId: s(order?._id),
+    orderMongoId: s(order?._id),
+    orderDisplayId: s(order?.order_id || order?._id),
+    restaurantName: s(payload?.restaurantName),
+    restaurantAddress: s(payload?.restaurantAddress),
+    customerAddress: s(payload?.customerAddress),
+    tripDistanceKm: s(payload?.tripDistanceKm ?? ''),
+    tripDurationMins: s(payload?.tripDurationMins ?? ''),
+    riderEarning: s(payload?.riderEarning ?? 0),
+    earnings: s(payload?.earnings ?? payload?.riderEarning ?? 0),
+    paymentMethod: s(payload?.paymentMethod || order?.payment?.method),
+    total: s(payload?.total ?? order?.pricing?.total ?? 0),
+    pickupAddress: s(payload?.restaurantAddress),
+    dropAddress: s(payload?.customerAddress),
+    price: s(payload?.earnings ?? payload?.riderEarning ?? 0),
+    distance: s(payload?.tripDistanceKm ?? ''),
+    orderNumber: s(order?.order_id || ''),
+    restaurantImage: s(payload?.restaurantCoverImage || ''),
+    pickupLat: s(payload?.restaurantLocation?.latitude ?? ''),
+    pickupLng: s(payload?.restaurantLocation?.longitude ?? ''),
+    dropLat: s(payload?.customerLocation?.latitude ?? ''),
+    dropLng: s(payload?.customerLocation?.longitude ?? ''),
+    customerName: s(payload?.customerName || order?.customerName || ''),
+    customerPhone: s(payload?.customerPhone || order?.customerPhone || ''),
+    itemsCount: s(Array.isArray(order?.items) ? order.items.length : ''),
+    paymentStatus: s(payload?.paymentStatus || order?.payment?.status || ''),
+    items: pushItems(order?.items),
+    acceptanceDeadlineAt: s(deadline?.toISOString?.() || deadline),
+  };
+}
+
 /** FCM data for the assignment alert: the offer's own map, marked as assigned. */
-async function assignmentPushData(order, payload, deadline, earning) {
-  const { buildIncomingOrderPushData } = await import(
-    '../../modules/quickCommerce/modules/food/orders/services/order-dispatch.service.js'
-  );
-  const s = (v) => (v === undefined || v === null ? '' : String(v));
+function assignmentPushData(order, payload, deadline, earning) {
+  const s = fcmString;
   const body = [
     payload?.restaurantName ? `Pickup: ${s(payload.restaurantName)}` : '',
     `Earning: Rs.${s(earning)}`,
@@ -440,7 +440,7 @@ async function assignmentPushData(order, payload, deadline, earning) {
     title: 'Order assigned to you',
     body,
     data: {
-      ...buildIncomingOrderPushData(order, payload, deadline),
+      ...incomingOrderPushData(order, payload, deadline),
       // Same type as an offer, so the alert the app already draws renders it.
       type: 'new_order',
       title: 'Order assigned to you',
@@ -475,8 +475,7 @@ export async function assignRider({ vertical: name, orderId, foodRiderId, admin 
   if (!foodRider) throw new NotFoundError('Rider not found');
   if (foodRider.status !== 'approved') throw new ValidationError('This rider is not approved for deliveries.');
 
-  const partnerId = ctx.isQc ? await qcRiderIdForFoodRider(foodRiderId) : String(foodRiderId);
-  if (!partnerId) throw new ValidationError('This rider could not be linked for Quick & Medical deliveries.');
+  const partnerId = String(foodRiderId);
 
   const store = await storePointForOrder(ctx, order);
   const warnings = await warningsFor({ order, foodRider, store });
@@ -573,7 +572,7 @@ export async function assignRider({ vertical: name, orderId, foodRiderId, admin 
   const earning = base.earningAmount ?? base.riderEarning ?? base.earnings ?? 0;
   void (async () => {
     try {
-      const pushData = await assignmentPushData(updated, payload, deadline, earning);
+      const pushData = assignmentPushData(updated, payload, deadline, earning);
       const push = {
         ...pushData,
         androidTag: `order_${String(updated._id)}`,
@@ -581,17 +580,9 @@ export async function assignRider({ vertical: name, orderId, foodRiderId, admin 
         data: { ...pushData.data, pickupDistanceKm: pickupDistanceKm == null ? '' : String(pickupDistanceKm) },
       };
       const { notifyOwnersActionableAlert } = await import('../notifications/firebase.service.js');
-      if (ctx.isQc) {
-        const io = ctx.socket.getIO?.();
-        if (io) io.to(ctx.socket.rooms.delivery(partnerId)).emit('order_assigned', payload);
-        await notifyOwnersActionableAlert([{ ownerType: 'DELIVERY_PARTNER', ownerId: partnerId }], push).catch(() => {});
-        // The app runs as the Food rider: socket and push there, ids rewritten.
-        await mirrorQcOfferToFoodRider(partnerId, { event: 'order_assigned', payload, push });
-      } else {
-        const io = ctx.socket.getIO?.();
-        if (io) io.to(ctx.socket.rooms.delivery(partnerId)).emit('order_assigned', payload);
-        await notifyOwnersActionableAlert([{ ownerType: 'DELIVERY_PARTNER', ownerId: partnerId }], push);
-      }
+      const io = ctx.socket.getIO?.();
+      if (io) io.to(ctx.socket.rooms.delivery(partnerId)).emit('order_assigned', payload);
+      await notifyOwnersActionableAlert([{ ownerType: 'DELIVERY_PARTNER', ownerId: partnerId }], push);
     } catch (err) {
       logger.warn(`[manualAssign] assignment alert failed for order ${updated._id}: ${err.message}`);
     }
@@ -697,8 +688,8 @@ export async function unassignRider({ vertical: name, orderId, admin = {} } = {}
       note: `Rider ${riderName || partnerId} unassigned by ${adminName}`,
     },
     // Food has no 'deassigned' offer state; dropping the entry keeps the order off
-    // that rider's list. Quick's 'deassigned' does the same and keeps the record.
-    offerAction: ctx.isQc ? 'deassigned' : 'remove',
+    // that rider's list.
+    offerAction: 'remove',
   });
   if (!updated) {
     throw new ValidationError('The rider accepted or the order changed meanwhile. Refresh and try again.');
@@ -706,7 +697,7 @@ export async function unassignRider({ vertical: name, orderId, admin = {} } = {}
 
   void tellRiderDeassigned(ctx, updated, partnerId, 'admin_unassigned', 'This order has been taken off you by our team.');
   announce(ctx, updated, {
-    event: 'rider_unassigned', riderId: await appRiderId(ctx, partnerId), riderName, note: `Unassigned by ${adminName}`,
+    event: 'rider_unassigned', riderId: partnerId, riderName, note: `Unassigned by ${adminName}`,
   });
   restartDispatch(ctx, updated._id);
   return { order: ctx.helpers.normalizeOrderForClient(updated) };
@@ -723,11 +714,11 @@ let expiryRunning = false;
  * being stacked on by the next tick.
  */
 export async function expireManualAssignments({ now = new Date() } = {}) {
-  const result = { food: 0, quickCommerce: 0, skipped: false };
+  const result = { food: 0, skipped: false };
   if (expiryRunning) return { ...result, skipped: true };
   expiryRunning = true;
   try {
-    for (const name of ['food', 'quickCommerce']) {
+    for (const name of ['food']) {
       // eslint-disable-next-line no-await-in-loop
       const ctx = await vertical(name);
       // eslint-disable-next-line no-await-in-loop
@@ -761,7 +752,7 @@ export async function expireManualAssignments({ now = new Date() } = {}) {
           result[name] += 1;
           void tellRiderDeassigned(ctx, updated, partnerId, 'timeout', 'You did not accept this order in time, so it has gone to other partners.');
           // eslint-disable-next-line no-await-in-loop
-          announce(ctx, updated, { event: 'rider_timeout', riderId: await appRiderId(ctx, partnerId), riderName, note: 'Rider didn\'t respond' });
+          announce(ctx, updated, { event: 'rider_timeout', riderId: partnerId, riderName, note: 'Rider didn\'t respond' });
           restartDispatch(ctx, updated._id);
         } catch (err) {
           logger.error(`[manualAssign] expiry failed for ${name} order ${row._id}: ${err.message}`);
@@ -771,8 +762,8 @@ export async function expireManualAssignments({ now = new Date() } = {}) {
   } finally {
     expiryRunning = false;
   }
-  if (result.food || result.quickCommerce) {
-    logger.info(`[manualAssign] expired manual assignments: food=${result.food} quickCommerce=${result.quickCommerce}`);
+  if (result.food) {
+    logger.info(`[manualAssign] expired manual assignments: food=${result.food}`);
   }
   return result;
 }
@@ -781,10 +772,10 @@ export async function expireManualAssignments({ now = new Date() } = {}) {
 /* Rider decline (called from both rejectOrderDelivery)                      */
 /* ------------------------------------------------------------------------ */
 
-/** The rider's name from the record the order stores (Quick or Food). */
+/** The rider's name from the record the order stores. */
 export async function riderDisplayName(verticalName, partnerId) {
   try {
-    const Model = verticalName === 'quickCommerce' ? await qcRiderModel() : await foodRiderModel();
+    const Model = await foodRiderModel();
     const row = await Model.findById(partnerId).select('name').lean();
     return row?.name || '';
   } catch {
@@ -820,7 +811,7 @@ export async function announceManualDecline(verticalName, order, partnerId, decl
   try {
     const ctx = await vertical(verticalName);
     announce(ctx, order, {
-      event: 'rider_declined', riderId: await appRiderId(ctx, partnerId), riderName: declined.riderName, note: declined.note,
+      event: 'rider_declined', riderId: String(partnerId), riderName: declined.riderName, note: declined.note,
     });
   } catch (err) {
     logger.warn(`[manualAssign] decline announcement failed: ${err.message}`);

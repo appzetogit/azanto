@@ -106,6 +106,8 @@ This is the risky part. It touches payments and rider money, so it goes in its o
 - Delete `src/modules/quickCommerce/`, `src/modules/serviceProvider/`, the QC/SP tests and the `/qc` handling in workers and queues.
 - Run the full food and taxi test suite. Boot-test against a copy of the database.
 
+**Done (code):** both module directories, the QC/SP-only tests and scripts are deleted. Every QC/SP branch in `core/*` and the food module was removed rather than repointed, since this database never held QC or SP data. Nothing still imports either module. The boot test against a database copy is still open.
+
 ---
 
 ## Phase 4: Verify and ship

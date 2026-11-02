@@ -13,13 +13,9 @@ import { FoodNotification } from './models/notification.model.js';
  * never arrived because notifications were off, it was gone.
  *
  * Every customer push now also lands here, via recordCustomerNotification,
- * under the customer's PLATFORM id:
- *   food, taxi       already are platform ids (`users`)
- *   quickCommerce    qc_users -> platformUserId, else the same phone in `users`
- *   serviceProvider  sp_users -> platformUserId, else the same phone
- * (worked out from the id itself -- see OWN_USERS)
- * A customer with no platform account is left out rather than filed somewhere
- * the app cannot read.
+ * under the customer's PLATFORM id (food and taxi already use it; see
+ * identity/platformUser.js). A customer with no platform account is left out
+ * rather than filed somewhere the app cannot read.
  *
  * Recording is best-effort and never throws: an inbox write must not stop the
  * push, the order update, or the request that triggered it.

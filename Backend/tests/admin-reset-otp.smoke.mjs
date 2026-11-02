@@ -3,7 +3,7 @@
  *
  * Run: node tests/admin-reset-otp.smoke.mjs
  *
- *  - Food and quick-commerce: with USE_DEFAULT_OTP=true -- set in production for
+ *  - Food: with USE_DEFAULT_OTP=true -- set in production for
  *    customer SMS -- every admin reset code was "123456". Anyone who knew an admin's
  *    email could reset the password and sign in as that admin. The code is emailed,
  *    so the SMS reason never applied. Now fixed only outside production.
@@ -38,7 +38,6 @@ const main = async () => {
 
     for (const [label, servicePath, configPath, adminPath, otpModelPath] of [
         ['food', '../src/core/auth/auth.service.js', '../src/config/env.js', '../src/core/admin/admin.model.js', '../src/core/admin/adminResetOtp.model.js'],
-        ['quick-commerce', '../src/modules/quickCommerce/core/auth/auth.service.js', '../src/modules/quickCommerce/config/env.js', '../src/modules/quickCommerce/core/admin/admin.model.js', '../src/modules/quickCommerce/core/admin/adminResetOtp.model.js'],
     ]) {
         console.log(`\n${label}`);
         const { config } = await import(configPath);

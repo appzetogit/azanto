@@ -111,12 +111,6 @@ const startServer = async () => {
         const { configureTaxiSocketServer } = await import('./src/modules/taxi/socket/index.js');
         configureTaxiSocketServer(getIO());
 
-        // 3c/3d. The Service-Provider socket namespace (/sp, configureSPSocketServer)
-        // and the quick-commerce namespace (/qc, initQCSocket) are no longer started:
-        // QC and SP are switched off because the product is food + taxi only. Their
-        // modules stay in place (core/* still imports QC models) until they are
-        // deleted in a later change; their HTTP routes are unmounted too.
-
         if (config.redisEnabled) {
             await connectRedis();
         }
@@ -285,11 +279,6 @@ const startServer = async () => {
         };
 
         const startIntervals = () => {
-            // The Service-Provider booking scheduler (bookingScheduler.initializeScheduler,
-            // wave-based vendor alerting) is no longer started, so SP_SCHEDULER_ENABLED
-            // no longer does anything: SP is switched off because the product is
-            // food + taxi only.
-
             // Master ledger nightly reconciliation. Its own flag, off by default, and
             // not tied to BACKGROUND_JOBS_ENABLED: it claims each night in the database,
             // so a second instance cannot double-run it. See core/finance/ledgerNightly.js.
@@ -302,9 +291,7 @@ const startServer = async () => {
             // restaurant, and each release is claimed in the database, so a second
             // instance cannot alert twice. See core/orders/orderHold.js.
             Promise.all([
-                // Importing the helpers registers food's hold target. QC's helpers,
-                // which only register QC's own 'quickCommerce' target, are no longer
-                // loaded here: QC is switched off, the product is food + taxi only.
+                // Importing the helpers registers food's hold target.
                 import('./src/modules/food/orders/services/order.helpers.js'),
             ])
                 .then(() => import('./src/core/orders/orderHold.js'))

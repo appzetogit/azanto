@@ -43,15 +43,7 @@ export const processMaintenanceJob = async (job) => {
     }
 
     if (type === 'STALE_SWEEP') {
-        // Unpaid quick-commerce orders give their stock back, and abandoned taxi
-        // rides stop blocking their driver and customer. Each step on its own:
-        // one failing must not stop the other.
-        try {
-            const { expireStalePendingPaymentOrders } = await import('../../modules/quickCommerce/modules/food/orders/services/order.service.js');
-            await expireStalePendingPaymentOrders();
-        } catch (err) {
-            logger.error(`[BullMQ:maintenance] QC pending-payment sweep failed: ${err.message}`);
-        }
+        // Abandoned taxi rides stop blocking their driver and customer.
         try {
             const { sweepStaleRides } = await import('../../modules/taxi/services/staleRideSweep.js');
             await sweepStaleRides();

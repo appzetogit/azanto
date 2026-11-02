@@ -53,7 +53,6 @@ const EPSILON = 0.005;
 /** Collection names used in source-row keys. Fixed strings, not read from models. */
 export const SOURCE_COLLECTIONS = Object.freeze({
     food: { deposit: 'food_delivery_cash_deposits', withdrawal: 'food_delivery_withdrawals' },
-    quickCommerce: { deposit: 'qc_delivery_cash_deposits', withdrawal: 'qc_delivery_withdrawals' },
 });
 
 /**
@@ -78,7 +77,7 @@ export const targetsFor = ({ ownerId, vertical, orders = [], deposits = [], bonu
         out.push({
             key: at(forOrderRiderEarning(o._id)),
             type: 'EARNING',
-            jobType: vertical === 'food' ? 'foodDelivery' : 'quickCommerceDelivery',
+            jobType: 'foodDelivery',
             jobId: String(o._id),
             amount: delivered ? round2(o.riderEarning) : 0,
             cash: delivered && o?.payment?.method === 'cash' ? round2(o?.pricing?.total) : 0,

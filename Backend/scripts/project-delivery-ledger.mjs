@@ -1,14 +1,14 @@
 /**
- * Project food and quick-commerce rider money into the master ledger, then prove
+ * Project food rider money into the master ledger, then prove
  * the ledger agrees with riderFinance.
  *
  * See core/finance/deliveryLedgerProjector.js for why this is a projection and not
  * a dual-write, and why running it repeatedly is safe.
  *
  * Usage:
- *   node scripts/project-delivery-ledger.mjs                       dry run, both verticals
+ *   node scripts/project-delivery-ledger.mjs                       dry run, every delivery vertical
  *   node scripts/project-delivery-ledger.mjs --vertical food       one vertical
- *   node scripts/project-delivery-ledger.mjs --partner <id> --vertical quickCommerce
+ *   node scripts/project-delivery-ledger.mjs --partner <id> --vertical food
  *   node scripts/project-delivery-ledger.mjs --commit              append, then reconcile
  *
  * Dry run is READ-ONLY: it reads orders, deposits, withdrawals, bonuses and the

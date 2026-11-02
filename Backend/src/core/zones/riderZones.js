@@ -12,8 +12,7 @@ import { logger } from '../../utils/logger.js';
  * A rider with neither is shown only to admins without a zone limit, who can
  * see every rider -- so no rider is lost, and none leaks to another zone's admin.
  *
- * Food riders are matched against Food zones; Quick riders against Quick and
- * Medical zones (a sub-admin's qc_zone_ids holds both).
+ * Riders are matched against Food zones, the only delivery zones there are.
  */
 
 const asIds = (list) => (Array.isArray(list) ? list : [])
@@ -34,17 +33,9 @@ function polygonOf(zone) {
 }
 
 async function zoneDocs(vertical, ids) {
-    if (!ids.length) return [];
-    if (vertical === 'food') {
-        const { FoodZone } = await import('../../modules/food/admin/models/zone.model.js');
-        return FoodZone.find({ _id: { $in: ids } }).select('coordinates').lean();
-    }
-    const { zoneModelFor } = await import('../../modules/quickCommerce/modules/food/shared/zoneServiceability.js');
-    const [quick, medical] = await Promise.all([
-        zoneModelFor('quick').find({ _id: { $in: ids } }).select('coordinates').lean(),
-        zoneModelFor('medical').find({ _id: { $in: ids } }).select('coordinates').lean(),
-    ]);
-    return [...quick, ...medical];
+    if (!ids.length || vertical !== 'food') return [];
+    const { FoodZone } = await import('../../modules/food/admin/models/zone.model.js');
+    return FoodZone.find({ _id: { $in: ids } }).select('coordinates').lean();
 }
 
 /**

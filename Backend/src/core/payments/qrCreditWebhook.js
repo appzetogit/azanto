@@ -1,7 +1,7 @@
 /**
  * Razorpay `qr_code.credited`: money landed on a dynamic UPI QR a driver or
  * rider showed (core/payments/razorpayQr.js). The QR's notes say what it was
- * for -- { kind: 'taxi_ride' | 'food_order' | 'qc_order', refId }.
+ * for -- { kind: 'taxi_ride' | 'food_order', refId }.
  *
  * Nothing in the event body is taken as proof of payment: each case re-reads
  * the QR from Razorpay through the same sync the driver's app polls, so the
@@ -24,7 +24,6 @@ const refundWith = (helperPath) => async (paymentId, amount) => {
     return result;
 };
 const FOOD_REFUND = refundWith('../../modules/food/orders/helpers/razorpay.helper.js');
-const QC_REFUND = refundWith('../../modules/quickCommerce/modules/food/orders/helpers/razorpay.helper.js');
 
 const ORDER_VERTICALS = {
     food_order: {
@@ -34,14 +33,6 @@ const ORDER_VERTICALS = {
         }),
         sync: async () => (await import('../../modules/food/orders/services/order-payment.service.js')).syncRazorpayQrPayment,
         refund: FOOD_REFUND,
-    },
-    qc_order: {
-        models: async () => ({
-            Order: (await import('../../modules/quickCommerce/modules/food/orders/models/order.model.js')).FoodOrder,
-            Transaction: (await import('../../modules/quickCommerce/modules/food/orders/models/foodTransaction.model.js')).FoodTransaction,
-        }),
-        sync: async () => (await import('../../modules/quickCommerce/modules/food/orders/services/order-payment.service.js')).syncRazorpayQrPayment,
-        refund: QC_REFUND,
     },
 };
 

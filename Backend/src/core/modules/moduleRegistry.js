@@ -34,10 +34,9 @@ export const isKnownModule = (name) => ALL_MODULES.includes(String(name));
 
 /**
  * The verticals the admin panel is shown and may switch. The product is food + taxi
- * only: quick commerce and service-provider are switched off (their routes are no
- * longer mounted), so offering a switch for them would be a switch that does nothing.
- * MODULES and ALL_MODULES keep them because code that still imports the QC/SP
- * modules references MODULES.QUICK_COMMERCE / SERVICE_PROVIDER.
+ * only: quick commerce and service-provider were removed, so offering a switch for
+ * them would be a switch that does nothing. MODULES and ALL_MODULES still name them
+ * so a stored module state for either keeps reading as known rather than erroring.
  */
 export const ACTIVE_MODULES = Object.freeze([MODULES.FOOD, MODULES.TAXI]);
 

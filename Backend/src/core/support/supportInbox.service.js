@@ -5,22 +5,21 @@ import { decideAdminAccess } from '../admin/adminAccessPolicy.js';
 /**
  * One support inbox for the whole platform (Master > Help & Support).
  *
- * Tickets are raised in seven places -- customers, restaurants/stores and riders
- * in Food and in Quick (which includes Medical), and everyone in Taxi -- and each
- * service's admin saw only its own. This reads all seven into one list and hands
- * every change back to the service that owns the ticket: a reply goes through
- * that service's own update function, so whatever it already does on a reply
- * (Quick notifies the customer, Taxi adds to the conversation) still happens,
- * and each service's own screen keeps showing the same ticket.
+ * Tickets are raised in four places -- customers, restaurants and riders in
+ * Food, and everyone in Taxi -- and each service's admin saw only its own. This
+ * reads all four into one list and hands every change back to the service that
+ * owns the ticket: a reply goes through that service's own update function, so
+ * whatever it already does on a reply (Taxi adds to the conversation) still
+ * happens, and each service's own screen keeps showing the same ticket.
  *
  * The tickets stay where they are. Moving them into one collection would mean
  * changing every app that raises or reads one; this gives admins one place to
  * work without touching any of them.
  *
  * Statuses differ per service and are shown as three:
- *   open         food/quick 'open', taxi 'pending'
- *   in_progress  food/quick 'in-progress' / 'in_progress', taxi 'assigned'
- *   resolved     food/quick 'resolved' (and riders' 'closed'), taxi 'closed'
+ *   open         food 'open', taxi 'pending'
+ *   in_progress  food 'in-progress' / 'in_progress', taxi 'assigned'
+ *   resolved     food 'resolved' (and riders' 'closed'), taxi 'closed'
  */
 
 export const INBOX_STATUSES = ['open', 'in_progress', 'resolved'];
@@ -29,7 +28,6 @@ const PER_SOURCE_LIMIT = 500;
 
 const model = async (path, name) => (await import(path))[name];
 const foodAdmin = () => import('../../modules/food/admin/services/admin.service.js');
-const quickAdmin = () => import('../../modules/quickCommerce/modules/food/admin/services/admin.service.js');
 
 /*
  * Each source: where its tickets are, whose they are, and how to write back.
@@ -65,36 +63,6 @@ const SOURCES = {
     toInbox: (s) => (s === 'closed' ? 'resolved' : s),
     toOwn: (s) => s,
     update: async (id, { status, reply }) => (await foodAdmin()).updateDeliverySupportTicket(id, { status, adminResponse: reply }),
-  },
-  quick_customer: {
-    label: 'Quick · Customer',
-    service: 'quickCommerce',
-    requesterType: 'customer',
-    load: () => model('../../modules/quickCommerce/modules/food/user/models/supportTicket.model.js', 'FoodSupportTicket'),
-    people: { field: 'userId', collection: 'qc_users', name: (d) => d.name, phone: (d) => d.phone },
-    toInbox: (s) => ({ 'in-progress': 'in_progress' }[s] || s),
-    toOwn: (s) => ({ in_progress: 'in-progress' }[s] || s),
-    update: async (id, { status, reply }) => (await quickAdmin()).updateSupportTicket(id, { source: 'user', status, adminResponse: reply }),
-  },
-  quick_store: {
-    label: 'Quick · Store',
-    service: 'quickCommerce',
-    requesterType: 'store',
-    load: () => model('../../modules/quickCommerce/modules/food/restaurant/models/supportTicket.model.js', 'FoodRestaurantSupportTicket'),
-    people: { field: 'restaurantId', collection: 'qc_restaurants', name: (d) => d.restaurantName, phone: (d) => d.ownerPhone || d.phone },
-    toInbox: (s) => ({ 'in-progress': 'in_progress' }[s] || s),
-    toOwn: (s) => ({ in_progress: 'in-progress' }[s] || s),
-    update: async (id, { status, reply }) => (await quickAdmin()).updateSupportTicket(id, { source: 'restaurant', status, adminResponse: reply }),
-  },
-  quick_rider: {
-    label: 'Quick · Rider',
-    service: 'quickCommerce',
-    requesterType: 'rider',
-    load: () => model('../../modules/quickCommerce/modules/food/delivery/models/supportTicket.model.js', 'DeliverySupportTicket'),
-    people: { field: 'deliveryPartnerId', collection: 'qc_delivery_partners', name: (d) => d.name, phone: (d) => d.phone },
-    toInbox: (s) => (s === 'closed' ? 'resolved' : s),
-    toOwn: (s) => s,
-    update: async (id, { status, reply }) => (await quickAdmin()).updateDeliverySupportTicket(id, { status, adminResponse: reply }),
   },
   taxi: {
     label: 'Taxi',

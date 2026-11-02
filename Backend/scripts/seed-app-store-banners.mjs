@@ -27,11 +27,9 @@ const file = (name) => ({ buffer: fs.readFileSync(path.join(dir, name)), origina
 const foodHero = await import('../src/modules/food/landing/services/heroBanner.service.js');
 const dining = await import('../src/modules/food/landing/services/diningBanner.service.js');
 const under250 = await import('../src/modules/food/landing/services/under250Banner.service.js');
-const qcHero = await import('../src/modules/quickCommerce/modules/food/landing/services/heroBanner.service.js');
 const { FoodHeroBanner } = await import('../src/modules/food/landing/models/heroBanner.model.js');
 const { FoodDiningBanner } = await import('../src/modules/food/landing/models/diningBanner.model.js');
 const { FoodUnder250Banner } = await import('../src/modules/food/landing/models/under250Banner.model.js');
-const { FoodHeroBanner: QCHeroBanner } = await import('../src/modules/quickCommerce/modules/food/landing/models/heroBanner.model.js');
 
 // [label, model, filter that defines the slot, files, create(files)]
 const SLOTS = [
@@ -53,7 +51,6 @@ const SLOTS = [
   ]),
   ['dining banners', FoodDiningBanner, {}, ['dining-1.png', 'dining-2.png'], (fs_) => dining.createDiningBannersFromFiles(fs_, {})],
   ['under-250 banners', FoodUnder250Banner, {}, ['value-1.png', 'value-2.png'], (fs_) => under250.createUnder250BannersFromFiles(fs_, {})],
-  ['quick-commerce hero banners', QCHeroBanner, {}, ['quick-hero.png'], (fs_) => qcHero.createHeroBannersFromFiles(fs_, {})],
 ];
 
 await mongoose.connect(process.env.MONGODB_URI);

@@ -4,14 +4,15 @@
  * Run: node tests/commission-overview.smoke.mjs
  *
  * What this guards:
+ *   - only Food and Taxi are reported: quick commerce and services are gone, and
+ *     rows left in their old collections do not appear;
  *   - each seller's rate is the one its next order would be charged, through
  *     the services' own rate functions: a dated schedule shows over the
- *     standing rate, a pharmacy with no rate shows the Medical default;
+ *     standing rate;
  *   - a seller with no rate at all is counted, since it pays nothing;
  *   - last-30-day commission and the effective rate come from delivered
  *     orders only;
  *   - Taxi's rates come from each fare row, named by vehicle and city;
- *   - Services shows the platform's share of service charges and parts;
  *   - each admin sees only what their permissions cover.
  */
 import assert from 'node:assert/strict';
@@ -70,7 +71,7 @@ await ledger('food_orders', 'food_transactions', joy, 'delivered', daysAgo(10), 
 await ledger('food_orders', 'food_transactions', joy, 'delivered', daysAgo(45), 999, 99);
 await ledger('food_orders', 'food_transactions', joy, 'cancelled_by_user', daysAgo(3), 999, 99);
 
-// --- Quick & Medical: store with a rate, pharmacy on the default, pharmacy with its own.
+// --- Rows left behind by the removed quick-commerce and services verticals.
 const grocer = oid();
 const pharmaDefault = oid();
 const pharmaOwn = oid();
@@ -125,32 +126,26 @@ await check('last 30 days: delivered orders only, with the effective rate', asyn
   assert.equal(svc.food.mode, 'commission');
 });
 
-console.log('\nQuick & Medical');
-await check('a store\'s own rate', async () => {
-  assert.deepEqual(row('quick', 'Daily Needs').rate, { type: 'percentage', value: 10 });
-  assert.equal(row('quick', 'Daily Needs').kind, 'store');
+console.log('\nOnly Food and Taxi');
+await check('an owner sees Food and Taxi, and nothing else', async () => {
+  assert.deepEqual(report.services.map((s) => s.key), ['food', 'taxi']);
+  assert.equal(svc.quick, undefined);
+  assert.equal(svc.services, undefined);
 });
-await check('a pharmacy with no rate pays the Medical default', async () => {
-  assert.deepEqual(row('quick', 'Sharma Medical').rate, { type: 'percentage', value: 8 });
-  assert.equal(row('quick', 'Sharma Medical').source, 'medical_default');
-  assert.deepEqual(svc.quick.medicalDefault, { type: 'percentage', value: 8 });
-});
-await check('a pharmacy with its own flat rate keeps it', async () => {
-  assert.deepEqual(row('quick', 'City Chemist').rate, { type: 'amount', value: 20 });
-  assert.equal(row('quick', 'City Chemist').source, 'restaurant_default');
+await check('a quick-commerce or services sub-admin is refused', async () => {
+  for (const [service, permissions] of [['quickCommerce', ['restaurants.read']], ['medical', ['restaurants.read']], ['serviceProvider', ['settings.read']]]) {
+    const sub = { _id: oid(), role: 'ADMIN', adminLevel: 'subadmin', admin_type: 'subadmin', parentAdminId: owner._id, servicesAccess: [service], permissions };
+    await assert.rejects(() => commissionOverview(sub), /access to commission/, service);
+  }
 });
 
-console.log('\nTaxi and Services');
+console.log('\nTaxi');
 await check('Taxi rates come from each fare row, by vehicle and city', async () => {
   const by = Object.fromEntries(svc.taxi.rows.map((r) => [r.vehicle, r]));
   assert.deepEqual(by.Bike.rate, { type: 'percentage', value: 12 });
   assert.equal(by.Bike.where, 'Palampur');
   assert.deepEqual(by.Sedan.rate, { type: 'amount', value: 25 });
   assert.equal(by.Sedan.where, 'Every city');
-});
-await check('Services: the platform keeps what the vendor does not', async () => {
-  assert.deepEqual(svc.services.platformShare, { service: 25, parts: 80 });
-  assert.equal(svc.services.fromSettings, true);
 });
 
 console.log('\nWho sees what');

@@ -1,12 +1,11 @@
 // One OTP budget per phone number, shared by every service on the platform.
 //
-// Before this existed: food counted per-scope in Mongo, service-provider counted in
-// Redis (and so counted nothing, because REDIS_ENABLED is unset and that path failed
-// open), and taxi's three OTP entry points had no throttle at all. A single number
+// Before this existed: food counted per-scope in Mongo and taxi's three OTP entry
+// points had no throttle at all. A single number
 // could pull a full quota from each service independently.
 //
 // The check that matters is CROSS-SERVICE: spend the budget on taxi, then confirm food
-// and service-provider are already exhausted for that number.
+// is already exhausted for that number.
 //
 // Run: node tests/otp.ratelimit.smoke.mjs
 
@@ -63,8 +62,6 @@ console.log('\n[2] THE POINT — the budget is shared across services');
     const food = await consumeOtpQuota(phone, { service: OTP_SERVICES.FOOD });
     check('food is now refused for that number', () => assert.equal(food.allowed, false));
 
-    const sp = await consumeOtpQuota(phone, { service: OTP_SERVICES.SERVICE_PROVIDER });
-    check('service-provider is also refused', () => assert.equal(sp.allowed, false));
 }
 
 console.log('\n[3] numbers do not interfere with each other');
@@ -119,15 +116,12 @@ console.log('\n[8] every OTP send path is wired in');
         'taxi user login': '../src/modules/taxi/user/services/userOtpService.js',
         'taxi driver login': '../src/modules/taxi/driver/services/loginOtpService.js',
         'taxi driver onboarding': '../src/modules/taxi/driver/services/onboardingService.js',
-        'service-provider': '../src/modules/serviceProvider/utils/redisOtp.util.js',
     };
     for (const [label, p] of Object.entries(paths)) {
         const src = await readFile(new URL(p, import.meta.url), 'utf8');
         check(`${label} consumes the shared budget`, () => assert.match(src, /consumeOtpQuota/));
     }
     // and the old per-service counters are gone
-    const spSrc = await readFile(new URL(paths['service-provider'], import.meta.url), 'utf8');
-    check('service-provider no longer counts in Redis', () => assert.doesNotMatch(spSrc, /rate:otp:/));
     const foodSrc = await readFile(new URL(paths['core/otp (food)'], import.meta.url), 'utf8');
     check('food no longer enforces via requestCount', () => assert.doesNotMatch(foodSrc, /requestCount >= /));
 }

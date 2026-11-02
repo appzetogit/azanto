@@ -30,8 +30,8 @@ export function resolveAdminLevel(admin) {
       // Same single-service rule for serviceProvider. Deliberately NOT generalised
       // over every module: a taxi-only superadmin currently falls through to
       // PLATFORM_SUPERADMIN, and changing that would silently demote live accounts.
-      // (It does not leak into this module -- SP gates on the servicesAccess array
-      // itself, see modules/serviceProvider/utils/serviceAccess.js.)
+      // Kept although the service-provider module is gone: dropping it would promote
+      // a stored SP-only superadmin to PLATFORM_SUPERADMIN.
       if (admin.servicesAccess?.includes('serviceProvider') && admin.servicesAccess?.length === 1) {
         return ADMIN_LEVELS.SERVICE_PROVIDER_SUPERADMIN;
       }

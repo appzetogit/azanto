@@ -127,74 +127,31 @@ const main = async () => {
         assert.equal(err?.statusCode, 401);
     });
 
-    // ------------------------------------------- stores and medical stores ---
-    console.log('\nquick commerce (stores, medical stores)');
+    // ------------------------------------------------ admin password setter ---
+    console.log('\nadmin password setter');
     const { setSellerPortalPassword } = await import('../src/core/auth/sellerWebLogin.js');
-    const partner = await import('../src/modules/quickCommerce/modules/food/partner/partner.service.js');
-    const { FoodRestaurant: QCSeller } = await import('../src/modules/quickCommerce/modules/food/restaurant/models/restaurant.model.js');
-
-    const pharmacy = await QCSeller.create({
-        restaurantName: 'Web Login Pharmacy',
-        ownerName: 'Chemist',
-        ownerEmail: 'chemist@gmail.com',
+    const managed = await FoodRestaurant.create({
+        restaurantName: 'Admin Managed Kitchen',
+        ownerName: 'Owner 3',
+        ownerEmail: 'managed@gmail.com',
         ownerPhone: '9876509999',
-        storeType: 'pharmacy',
         status: 'approved',
-        pureVegRestaurant: false,
-    });
-    const pendingStore = await QCSeller.create({
-        restaurantName: 'Pending Grocery',
-        ownerName: 'Grocer',
-        ownerEmail: 'grocer@gmail.com',
-        ownerPhone: '9876508888',
-        storeType: 'grocery',
-        status: 'pending',
         pureVegRestaurant: false,
     });
 
     await check('admin setter refuses a short password and stores a hash otherwise', async () => {
-        const short = await rejects(setSellerPortalPassword(QCSeller, String(pharmacy._id), 'short'));
+        const short = await rejects(setSellerPortalPassword(FoodRestaurant, String(managed._id), 'short'));
         assert.equal(short?.statusCode, 400);
-        const saved = await setSellerPortalPassword(QCSeller, String(pharmacy._id), 'pharma-pass-1');
+        const saved = await setSellerPortalPassword(FoodRestaurant, String(managed._id), 'managed-pass-1');
         assert.ok(saved.portalPasswordSetAt);
-        const raw = await QCSeller.findById(pharmacy._id).select('+portalPassword').lean();
+        const raw = await FoodRestaurant.findById(managed._id).select('+portalPassword').lean();
         assert.match(raw.portalPassword, /^\$2[aby]\$/);
-        await setSellerPortalPassword(QCSeller, String(pendingStore._id), 'grocer-pass-1');
     });
 
-    await check('a medical store cannot sign in through the store login', async () => {
-        const err = await rejects(partner.requestPartnerWebLoginOtp({ email: 'chemist@gmail.com', password: 'pharma-pass-1', type: 'store' }));
-        assert.equal(err?.statusCode, 400);
-        assert.match(err.message, /medical store/);
-    });
-
-    await check('a store still under review is told so, and gets no code', async () => {
-        const err = await rejects(partner.requestPartnerWebLoginOtp({ email: 'grocer@gmail.com', password: 'grocer-pass-1', type: 'store' }));
-        assert.match(err?.message || '', /under review/);
-    });
-
-    await check('wrong password is refused for stores too', async () => {
-        const err = await rejects(partner.requestPartnerWebLoginOtp({ email: 'chemist@gmail.com', password: 'nope', type: 'medical' }));
-        assert.equal(err?.statusCode, 401);
-    });
-
-    await check('a restaurant ticket is useless on the store login', async () => {
-        const food = await auth.requestRestaurantWebLoginOtp('owner.kitchen@gmail.com', 'correct-horse-1');
-        const err = await rejects(partner.verifyPartnerWebLoginOtp({ ticket: food.ticket, email: 'owner.kitchen@gmail.com', otp: food.otp, type: 'store' }));
-        assert.equal(err?.statusCode, 401);
-    });
-
-    await check('medical store: password, then OTP to its phone, signs in', async () => {
-        const step = await partner.requestPartnerWebLoginOtp({ email: 'Chemist@Gmail.com', password: 'pharma-pass-1', type: 'medical' });
+    await check('a password the admin set signs the restaurant in', async () => {
+        const step = await auth.requestRestaurantWebLoginOtp('managed@gmail.com', 'managed-pass-1');
         assert.equal(step.maskedPhone, '******9999');
-        const resent = await partner.resendPartnerWebLoginOtp({ ticket: step.ticket, email: 'chemist@gmail.com' });
-        const result = await partner.verifyPartnerWebLoginOtp({ ticket: step.ticket, email: 'chemist@gmail.com', otp: resent.otp, type: 'medical' });
-        assert.equal(result.state, 'approved');
-        assert.ok(result.session?.accessToken);
-        assert.equal(String(result.session.user._id), String(pharmacy._id));
-        assert.ok(!JSON.stringify(result.session.user).includes('portalPassword"'), 'hash returned to client');
     });
-
 
     await mongoose.disconnect();
     await replSet.stop();

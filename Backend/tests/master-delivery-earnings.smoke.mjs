@@ -13,7 +13,7 @@
  *   - zone set     -> wins over vertical;
  *   - band matching keeps the old fallbacks (past the last band, below the first);
  *   - the incentive falls back to the module's rule, and a global rule reaches
- *     quick commerce, which has no rule of its own today;
+ *     a module with no rule of its own;
  *   - a malformed table is refused rather than stored.
  */
 import assert from 'node:assert/strict';
@@ -111,7 +111,7 @@ await check('an extra rate is validated like every other figure', () => {
 await check('a global table wins for every module', async () => {
   await set('earnings.distanceSlabs', { level: 'global', value: [band(0, null, 99, 5)] });
   invalidateCache();
-  for (const vertical of ['food', 'quickCommerce', 'medical']) {
+  for (const vertical of ['food', 'taxi']) {
     const { slabs, level } = await resolveEarningSlabs({ vertical, loadLegacy });
     assert.equal(level, 'global', vertical);
     assert.equal(pickSlab(slabs, 12).basePayout, 99, vertical);
@@ -119,12 +119,12 @@ await check('a global table wins for every module', async () => {
 });
 
 await check('a module override beats the global table, for that module only', async () => {
-  await set('earnings.distanceSlabs', { level: 'vertical', scopeId: 'quickCommerce', value: [band(0, null, 44, 3)] });
+  await set('earnings.distanceSlabs', { level: 'vertical', scopeId: 'taxi', value: [band(0, null, 44, 3)] });
   invalidateCache();
-  const qc = await resolveEarningSlabs({ vertical: 'quickCommerce', loadLegacy });
-  assert.equal(qc.level, 'vertical');
-  assert.equal(pickSlab(qc.slabs, 2).basePayout, 44);
-  // Food is untouched by quick commerce's override.
+  const taxi = await resolveEarningSlabs({ vertical: 'taxi', loadLegacy });
+  assert.equal(taxi.level, 'vertical');
+  assert.equal(pickSlab(taxi.slabs, 2).basePayout, 44);
+  // Food is untouched by taxi's override.
   const food = await resolveEarningSlabs({ vertical: 'food', loadLegacy });
   assert.equal(food.level, 'global');
   assert.equal(pickSlab(food.slabs, 2).basePayout, 99);
@@ -133,37 +133,37 @@ await check('a module override beats the global table, for that module only', as
 await check('a city override beats the module table', async () => {
   await set('earnings.distanceSlabs', { level: 'zone', scopeId: ZONE, value: [band(0, null, 77, 9)] });
   invalidateCache();
-  const inZone = await resolveEarningSlabs({ vertical: 'quickCommerce', zoneId: ZONE, loadLegacy });
+  const inZone = await resolveEarningSlabs({ vertical: 'taxi', zoneId: ZONE, loadLegacy });
   assert.equal(inZone.level, 'zone');
   assert.equal(pickSlab(inZone.slabs, 2).basePayout, 77);
   // Another city still reads the module table.
-  const elsewhere = await resolveEarningSlabs({ vertical: 'quickCommerce', zoneId: String(new mongoose.Types.ObjectId()), loadLegacy });
+  const elsewhere = await resolveEarningSlabs({ vertical: 'taxi', zoneId: String(new mongoose.Types.ObjectId()), loadLegacy });
   assert.equal(elsewhere.level, 'vertical');
 });
 
 await check('clearing an override falls back to the level above', async () => {
   await set('earnings.distanceSlabs', { level: 'zone', scopeId: ZONE, value: null });
   invalidateCache();
-  const { level } = await resolveEarningSlabs({ vertical: 'quickCommerce', zoneId: ZONE, loadLegacy });
+  const { level } = await resolveEarningSlabs({ vertical: 'taxi', zoneId: ZONE, loadLegacy });
   assert.equal(level, 'vertical');
 });
 
-await check('the incentive falls back to the module rule, and a global rule reaches quick commerce', async () => {
+await check('the incentive falls back to the module rule, and a global rule reaches a module with none', async () => {
   const foodRule = { isEnabled: true, minOrderAmount: 500, incentivePercent: 4 };
   const before = await resolveIncentive({ vertical: 'food', legacy: foodRule });
   assert.equal(before.level, 'legacy');
   assert.equal(before.incentivePercent, 4);
-  // Quick commerce has no rule of its own: no incentive, not a free payout.
-  const qcBefore = await resolveIncentive({ vertical: 'quickCommerce', legacy: null });
-  assert.equal(qcBefore.isEnabled, false);
-  assert.equal(qcBefore.incentivePercent, 0);
+  // Taxi has no delivery incentive rule of its own: no incentive, not a free payout.
+  const taxiBefore = await resolveIncentive({ vertical: 'taxi', legacy: null });
+  assert.equal(taxiBefore.isEnabled, false);
+  assert.equal(taxiBefore.incentivePercent, 0);
 
   await set('earnings.incentive', { level: 'global', value: { isEnabled: true, minOrderAmount: 300, incentivePercent: 6 } });
   invalidateCache();
-  const qcAfter = await resolveIncentive({ vertical: 'quickCommerce', legacy: null });
-  assert.equal(qcAfter.level, 'global');
-  assert.equal(qcAfter.incentivePercent, 6);
-  assert.equal(qcAfter.minOrderAmount, 300);
+  const taxiAfter = await resolveIncentive({ vertical: 'taxi', legacy: null });
+  assert.equal(taxiAfter.level, 'global');
+  assert.equal(taxiAfter.incentivePercent, 6);
+  assert.equal(taxiAfter.minOrderAmount, 300);
 });
 
 await check('a malformed table is refused, not stored', () => {
@@ -204,6 +204,8 @@ await check('the editor endpoint returns the bands, their ids and the source', a
 
   const bad = await call('not-a-module');
   assert.equal(bad.statusCode, 400);
+  // Quick commerce and medical are gone, so they are not modules here either.
+  for (const removed of ['quickCommerce', 'medical']) assert.equal((await call(removed)).statusCode, 400, removed);
 });
 
 await check('a table cannot be set per rider', async () => {

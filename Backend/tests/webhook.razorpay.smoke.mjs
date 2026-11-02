@@ -13,7 +13,8 @@
  *   P0-14  there were two handlers for one Razorpay account, each reading its own
  *          vertical's collection, and Razorpay delivers each event to one URL. So
  *          whichever was not configured never ran. The single handler now resolves
- *          which collection owns the order.
+ *          which collection owns the order -- food's, now that quick commerce is
+ *          gone.
  *
  * signature.smoke.mjs and security.bypass.smoke.mjs cover the signature compare by
  * reading source. Nothing drove an actual event through the handler and looked at
@@ -76,7 +77,8 @@ async function main() {
 
   const { handleRazorpayWebhook } = await import('../src/core/payments/controllers/razorpayWebhook.controller.js');
   const { FoodOrder } = await import('../src/modules/food/orders/models/order.model.js');
-  const { FoodOrder: QCOrder } = await import('../src/modules/quickCommerce/modules/food/orders/models/order.model.js');
+  // Quick commerce is gone; its old collection is written raw to prove nothing reads it.
+  const StrayQcOrders = { collection: mongoose.connection.collection('qc_orders') };
 
   /*
    * Orders are inserted raw rather than through the models: only the fields the
@@ -173,45 +175,25 @@ async function main() {
   });
 
   // --- P0-14 ----------------------------------------------------------------
-  console.log('\nP0-14: one handler, whichever vertical owns the order');
+  console.log('\nP0-14: one handler, resolving the collection that owns the order');
 
-  await test('THE BUG: a quick-commerce order is settled by the single handler', async () => {
-    /*
-     * Before, the master handler read only food_orders. If the dashboard pointed
-     * at that URL, this event found nothing and the QC payment reconciled only if
-     * the customer's app happened to call /verify.
-     */
-    const { _id, rzOrderId } = await seedOrder(QCOrder, { total: 450 });
-    const res = await deliver(captured(rzOrderId, 45000));
-    assert.equal(res.statusCode, 200);
-    const order = await readOrder(QCOrder, _id);
-    assert.equal(order.payment.status, 'paid');
-    assert.equal(order.orderStatus, 'created');
-  });
-
-  await test('the amount rule applies to quick-commerce orders too', async () => {
-    const { _id, rzOrderId } = await seedOrder(QCOrder, { total: 450 });
-    await deliver(captured(rzOrderId, 100));
-    assert.notEqual((await readOrder(QCOrder, _id)).payment.status, 'paid');
-  });
-
-  await test('settling a QC order does not touch any food order', async () => {
-    const food = await seedOrder(FoodOrder, { total: 450 });
-    const qc = await seedOrder(QCOrder, { total: 450 });
-    await deliver(captured(qc.rzOrderId, 45000));
-    assert.equal((await readOrder(FoodOrder, food._id)).payment.status, 'pending');
-  });
-
-  await test('an event for an order in NO vertical is acknowledged and changes nothing', async () => {
+  await test('an event for an order in NO collection is acknowledged and changes nothing', async () => {
     const res = await deliver(captured('order_does_not_exist', 90000));
     assert.equal(res.statusCode, 200);
   });
 
-  await test('a refund on a quick-commerce payment is recorded against the QC order', async () => {
-    const paymentId = `pay_qc_refund_${++seq}`;
-    const { _id } = await seedOrder(QCOrder, { total: 450, status: 'paid', paymentId });
+  await test('quick commerce is gone: a stray qc_orders row is not settled', async () => {
+    const { _id, rzOrderId } = await seedOrder(StrayQcOrders, { total: 450 });
+    const res = await deliver(captured(rzOrderId, 45000));
+    assert.equal(res.statusCode, 200);
+    assert.equal((await readOrder(StrayQcOrders, _id)).payment.status, 'pending');
+  });
+
+  await test('a refund on a food payment is recorded against the food order', async () => {
+    const paymentId = `pay_food_refund_${++seq}`;
+    const { _id } = await seedOrder(FoodOrder, { total: 450, status: 'paid', paymentId });
     await deliver(refunded(paymentId, 45000));
-    const order = await readOrder(QCOrder, _id);
+    const order = await readOrder(FoodOrder, _id);
     assert.equal(order.payment.status, 'refunded');
     assert.equal(order.payment.refund.status, 'processed');
     assert.equal(order.payment.refund.amount, 450);
@@ -232,11 +214,11 @@ async function main() {
 
   await test('concurrent duplicate deliveries advance the order once', async () => {
     // Razorpay retries can overlap with the original delivery.
-    const { _id, rzOrderId } = await seedOrder(QCOrder, { total: 300 });
+    const { _id, rzOrderId } = await seedOrder(FoodOrder, { total: 300 });
     const body = captured(rzOrderId, 30000, `pay_conc_${++seq}`);
     const responses = await Promise.all(Array.from({ length: 6 }, () => deliver(body)));
     assert.ok(responses.every((r) => r.statusCode === 200));
-    const order = await readOrder(QCOrder, _id);
+    const order = await readOrder(FoodOrder, _id);
     assert.equal(order.payment.status, 'paid');
     assert.equal(order.statusHistory.length, 1);
   });

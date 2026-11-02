@@ -1,3 +1,4 @@
+import { config } from '../../../../config/env.js';
 import mongoose from 'mongoose';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { FoodItem } from '../models/food.model.js';
@@ -321,7 +322,7 @@ export async function approveFoodItem(id, options = {}) {
                 {
                     title: 'Dish Approved! 🍲',
                     body: `Your dish "${updated.name}" has been approved and is now visible to customers.`,
-                    image: updated.image || 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: updated.image || config.brandImageUrl,
                     data: {
                         type: 'food_approved',
                         foodId: String(updated._id),
@@ -369,7 +370,7 @@ export async function rejectFoodItem(id, reason) {
                 {
                     title: 'Dish Rejected ❌',
                     body: `Your dish "${updated.name}" was rejected. Reason: ${r}`,
-                    image: updated.image || 'https://azanto.buytogetherindia.com/brand/azanto-icon-512.png',
+                    image: updated.image || config.brandImageUrl,
                     data: {
                         type: 'food_rejected',
                         foodId: String(updated._id),

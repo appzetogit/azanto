@@ -29,9 +29,8 @@
  * The services the app shows, keyed the way the admin panel names them.
  * `zones` is the map each service is drawn on -- each has its own collection.
  *
- * Food and taxi only: quick commerce ('quick') and medical are switched off because
- * the product is food + taxi only, so neither the app nor the admin panel is offered
- * them. Their zone sources in appServices.service.js stay until the QC code goes.
+ * Food and taxi only: quick commerce ('quick') and medical were removed with the
+ * product cut to food + taxi.
  */
 export const APP_SERVICES = Object.freeze([
     { key: 'food', label: 'Food', zones: 'food' },
