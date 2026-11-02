@@ -76,11 +76,9 @@ export default function PromotionalBanner() {
       return
     }
 
-    // GIFs are stored as-is (animation kept, no compression), so they get more room.
-    const isGif = file.type === "image/gif"
-    const maxMb = isGif ? 5 : 2
+    const maxMb = 10
     if (file.size > maxMb * 1024 * 1024) {
-      alert(`${isGif ? "GIF" : "Image"} size must be ${maxMb}MB or less`)
+      alert(`File size must be ${maxMb}MB or less`)
       return
     }
 
@@ -360,7 +358,7 @@ export default function PromotionalBanner() {
                       )}
                       <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                     </div>
-                    <p className="text-[10px] text-slate-400">JPEG, PNG, WebP (max 2MB) or animated GIF (max 5MB).</p>
+                    <p className="text-[10px] text-slate-400">JPEG, PNG, WebP or animated GIF. Max 10MB.</p>
                   </div>
 
                   <div className="space-y-4">
