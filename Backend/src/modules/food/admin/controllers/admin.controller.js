@@ -1730,6 +1730,12 @@ export async function deleteZone(req, res, next) {
                 message: 'Zone not found'
             });
         }
+        if (result.error) {
+            return res.status(409).json({
+                success: false,
+                message: result.error
+            });
+        }
         res.status(200).json({
             success: true,
             message: 'Zone deleted successfully',

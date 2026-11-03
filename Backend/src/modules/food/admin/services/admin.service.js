@@ -5588,9 +5588,25 @@ export async function updateZone(id, body) {
     return { zone: zone.toObject() };
 }
 
+/*
+ * Refuses while restaurants are still assigned. The customer listings filter
+ * strictly on zoneId, so deleting a zone used to leave its restaurants pointing
+ * at nothing: the app put those customers in the next zone and showed them an
+ * empty list (Jaipur, 2026-11-03).
+ */
 export async function deleteZone(id) {
-    const zone = await FoodZone.findByIdAndDelete(id);
-    return zone ? { id } : null;
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    const zone = await FoodZone.findById(id).select('_id name').lean();
+    if (!zone) return null;
+    const restaurants = await FoodRestaurant.countDocuments({ zoneId: zone._id });
+    if (restaurants > 0) {
+        return {
+            error: `${restaurants} restaurant${restaurants === 1 ? ' is' : 's are'} still in "${zone.name}". `
+                + 'Move them to another zone (Food → Restaurants → Edit), or deactivate this zone instead of deleting it.',
+        };
+    }
+    await FoodZone.deleteOne({ _id: zone._id });
+    return { id };
 }
 
 // ----- Withdrawals (admin) -----
