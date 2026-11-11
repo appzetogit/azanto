@@ -44,15 +44,22 @@ const maybeWriteRouteToFirebase = ({ driverId, points }) => {
     return;
   }
 
-  database
-    .ref(`rides/${driverId}/route`)
-    .set({
-      points,
-      updatedAt: firebaseServerTimestamp(),
-    })
-    .catch((error) => {
-      console.error(`Firebase route sync failed for driver ${driverId}:`, error.message);
-    });
+  // This runs from setImmediate, so anything it throws synchronously is an
+  // uncaught exception that takes the whole server down -- keep it contained.
+  try {
+    database
+      .ref(`rides/${driverId}/route`)
+      .set({
+        points,
+        // A sentinel value, not a function: ServerValue.TIMESTAMP is { '.sv': 'timestamp' }.
+        updatedAt: firebaseServerTimestamp,
+      })
+      .catch((error) => {
+        console.error(`Firebase route sync failed for driver ${driverId}:`, error.message);
+      });
+  } catch (error) {
+    console.error(`Firebase route sync failed for driver ${driverId}:`, error.message);
+  }
 };
 
 export const updateDriverRoute = ({ io, rideId, driverId, coordinates }) => {
