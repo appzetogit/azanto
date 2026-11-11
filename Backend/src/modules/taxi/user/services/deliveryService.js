@@ -158,8 +158,9 @@ export const getDeliveryById = async ({ deliveryId, role, entityId }) => {
 };
 
 export const listDeliveriesForIdentity = async ({ role, entityId, limit }) => {
-  const rides = await listRideHistoryForIdentity({ role, entityId, limit });
-  return rides
+  // listRideHistoryForIdentity returns { results, pagination }, not an array.
+  const history = await listRideHistoryForIdentity({ role, entityId, limit });
+  return (history?.results || [])
     .filter((ride) => String(ride.serviceType || ride.type || 'ride').toLowerCase() === 'parcel')
     .map((ride) => ({
       ...ride,

@@ -367,6 +367,11 @@ const offerPushData = (order, payload = {}) => {
     tripDurationMins: str(payload.tripDurationMins),
     earningAmount: str(payload.earningAmount ?? payload.riderEarning),
     total: str(payload.total),
+    paymentMethod: str(payload.paymentMethod),
+    itemCount: str((payload.items || []).reduce((n, i) => n + (Number(i?.quantity) || 1), 0)),
+    restaurantPhone: str(payload.restaurantPhone),
+    restaurantLat: str(payload.restaurantLocation?.latitude),
+    restaurantLng: str(payload.restaurantLocation?.longitude),
   };
 };
 

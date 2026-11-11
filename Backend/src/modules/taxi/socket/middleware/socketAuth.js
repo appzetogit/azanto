@@ -1,6 +1,7 @@
 import { ApiError } from '../../../../utils/ApiError.js';
 import { User } from '../../user/models/User.js';
 import { verifyAccessToken } from '../../services/tokenService.js';
+import { resolveUnifiedDriverIdentity } from '../../services/driverIdentityBridge.js';
 
 export const getIdentityFromSocket = (socket) => {
   const token = socket.handshake.auth?.token;
@@ -25,6 +26,10 @@ export const attachSocketAuth = (io) => {
   io.use(async (socket, next) => {
     try {
       socket.auth = getIdentityFromSocket(socket);
+      // Resolved here, not in the connection handler: an await there delays handler
+      // registration, and socket.io drops events (a reconnecting driver's ride:join)
+      // that arrive before their handler exists.
+      socket.auth = await resolveUnifiedDriverIdentity(socket.auth);
 
       if (String(socket.auth.role || '').toLowerCase() === 'user') {
         const user = await User.findById(socket.auth.sub || socket.auth.id || socket.auth._id || socket.auth.userId).select('active isActive deletedAt').lean();

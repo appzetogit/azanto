@@ -58,7 +58,13 @@ function emitOrderUpdate(order, deliveryPartnerId) {
     }
 
     // Only send push notifications for key delivery milestones
-    const status = order.orderStatus;
+    // Reached pickup / reached drop only move deliveryState.status (orderStatus keeps
+    // its older values for the vendor app and admin panel), so read the rider's step too.
+    const riderStep = order.deliveryState?.status;
+    const status =
+      order.orderStatus !== 'delivered' && ['reached_pickup', 'reached_drop'].includes(riderStep)
+        ? riderStep
+        : order.orderStatus;
     if (!['reached_pickup', 'picked_up', 'reached_drop', 'delivered'].includes(status)) return;
 
     let userTitle = '';

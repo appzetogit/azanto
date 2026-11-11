@@ -1746,6 +1746,21 @@ const populateRideRealtime = async (rideId) => {
   return ride;
 };
 
+/**
+ * The parcel a client sees. The delivery record's copy wins as before, but its
+ * pickup/delivery proof photos are emptied when it is rebuilt on a status change,
+ * so the photos come from the ride's own parcel whenever it has them.
+ */
+const serializeRideParcel = (ride) => {
+  const plain = (v) => (v?.toObject ? v.toObject() : v);
+  const fromDelivery = plain(ride.deliveryId?.parcel);
+  const own = plain(ride.parcel);
+  if (!fromDelivery && !own) return null;
+  const base = fromDelivery || own;
+  const pick = (key) => (own?.[key]?.length ? own[key] : fromDelivery?.[key] || []);
+  return { ...base, pickupPhotos: pick('pickupPhotos'), deliveryPhotos: pick('deliveryPhotos') };
+};
+
 export const serializeRideRealtime = (ride) => ({
   rideId: String(ride._id),
   room: getRideRoom(ride._id),
@@ -1817,7 +1832,7 @@ export const serializeRideRealtime = (ride) => ({
     }
     : null,
   otp: ride.otp || '',
-  parcel: ride.deliveryId?.parcel || ride.parcel || null,
+  parcel: serializeRideParcel(ride),
   intercity: ride.intercity || null,
   commissionAmount: ride.commissionAmount,
   driverEarnings: ride.driverEarnings,
@@ -2074,7 +2089,7 @@ export const listRideHistoryForIdentity = async ({ role, entityId, limit = 50, p
       estimatedDurationMinutes: ride.estimatedDurationMinutes || 0,
       paymentMethod: ride.paymentMethod,
       otp: ride.otp || '',
-      parcel: ride.deliveryId?.parcel || ride.parcel || null,
+      parcel: serializeRideParcel(ride),
       intercity: ride.intercity || null,
       pricingSnapshot: ride.pricingSnapshot || null,
       commissionAmount: ride.commissionAmount,

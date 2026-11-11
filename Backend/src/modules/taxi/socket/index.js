@@ -31,7 +31,6 @@ import { SOCKET_EVENTS } from './events.js';
 import { registerRideSocketHandlers } from './handlers/rideSocketHandler.js';
 import { authorizeRideRoomAccess } from './middleware/rideRoomAuth.js';
 import { attachSocketAuth } from './middleware/socketAuth.js';
-import { resolveUnifiedDriverIdentity } from '../services/driverIdentityBridge.js';
 import { clearDriverRoute } from './services/driverRouteService.js';
 
 const onAsync = (socket, handler) => async (payload = {}) => {
@@ -54,8 +53,10 @@ export const configureTaxiSocketServer = (io) => {
     // Same bridge as the REST middleware. Rooms are assigned once, here, so a
     // delivery-app socket that is not translated sits in delivery:<partnerId>
     // only and every rideRequest — emitted to driver:<driverId> — misses it.
-    const identity = await resolveUnifiedDriverIdentity(socket.auth);
-    socket.auth = identity;
+    // The bridge itself now runs in attachSocketAuth, so socket.auth is already
+    // translated. Nothing in this handler may await before the socket.on(...)
+    // registrations below: events that arrive first are dropped by socket.io.
+    const identity = socket.auth;
 
     addSocketSubscriptions(socket, { role: identity.role, entityId: identity.sub });
 
@@ -63,10 +64,14 @@ export const configureTaxiSocketServer = (io) => {
     socket.join(getSupportRoleRoom(identity.role));
 
     if (identity.role === 'driver') {
-      await Driver.findByIdAndUpdate(identity.sub, { socketId: socket.id });
-      notifyLateAvailableDriver(identity.sub).catch((error) => {
-        console.error('Failed to notify late-available driver on socket connect', error);
-      });
+      Driver.findByIdAndUpdate(identity.sub, { socketId: socket.id })
+        .catch((error) => {
+          console.error('Failed to save driver socketId on connect', error);
+        })
+        .then(() => notifyLateAvailableDriver(identity.sub))
+        .catch((error) => {
+          console.error('Failed to notify late-available driver on socket connect', error);
+        });
     }
 
     // Only the conversation's own peer, or an admin, may listen in. The key was

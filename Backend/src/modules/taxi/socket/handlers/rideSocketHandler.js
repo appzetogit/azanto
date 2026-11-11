@@ -173,14 +173,20 @@ export const registerRideSocketHandlers = ({ io, socket, onAsync }) => {
 
   socket.on(
     SOCKET_EVENTS.RIDE_MESSAGE_SEND,
-    onAsync(socket, async ({ rideId, message }) => {
+    onAsync(socket, async ({ rideId, message, imageUrl }) => {
       await authorizeRideRoomAccess({ socket, rideId });
+
+      // The customer app sends photos as imageUrl; the message model only has
+      // text, so carry the link on its own line instead of dropping it.
+      const text = [String(message || '').trim(), String(imageUrl || '').trim()]
+        .filter(Boolean)
+        .join('\n');
 
       const savedMessage = await appendRideMessage({
         rideId,
         role: socket.auth.role,
         senderId: socket.auth.sub || socket.auth.id || socket.auth._id || socket.auth.userId,
-        message,
+        message: text,
       });
 
       io.to(getRideRoom(rideId)).emit(SOCKET_EVENTS.RIDE_MESSAGE_NEW, savedMessage);

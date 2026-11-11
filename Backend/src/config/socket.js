@@ -62,11 +62,14 @@ async function loadOrderParties(orderId) {
     }
 }
 
+// Callers often pass a populated document (order.userId after .populate()).
+// String() on that gives "{ _id: ... }", a room nobody is in -- so use its _id.
+const idOf = (v) => String(v?._id ?? v);
 const roomNames = {
-    restaurant: (id) => `restaurant:${String(id)}`,
-    user: (id) => `user:${String(id)}`,
-    delivery: (id) => `delivery:${String(id)}`,
-    tracking: (orderId) => `tracking:${String(orderId)}`,
+    restaurant: (id) => `restaurant:${idOf(id)}`,
+    user: (id) => `user:${idOf(id)}`,
+    delivery: (id) => `delivery:${idOf(id)}`,
+    tracking: (orderId) => `tracking:${idOf(orderId)}`,
     // Support is a shared inbox: any signed-in admin should see a customer's
     // message, so admins share one room and it carries no id. This mirrors the
     // quick-commerce fork, whose chat service this module's chat is ported from.
@@ -399,6 +402,26 @@ export const initSocket = async (server) => {
             if (!orderId) return;
             const room = roomNames.tracking(orderId);
             socket.leave(room);
+        });
+
+        // Customer <-> rider chat "typing..." indicator. The thread id is the order
+        // _id, so relay only between that order's customer and its current rider.
+        socket.on('chat:typing', async (p = {}) => {
+            try {
+                const conversationId = String(p?.conversationId || p?.orderId || '');
+                if (!conversationId) return;
+                const parties = await loadOrderParties(conversationId);
+                if (!parties) return;
+                const me = String(userId || '');
+                const payload = { conversationId, orderId: conversationId, typing: Boolean(p?.typing) };
+                if (role === 'USER' && me === parties.userId && parties.deliveryPartnerId) {
+                    io.to(roomNames.delivery(parties.deliveryPartnerId)).emit('chat:typing', payload);
+                } else if (role === 'DELIVERY_PARTNER' && me === parties.deliveryPartnerId && parties.userId) {
+                    io.to(roomNames.user(parties.userId)).emit('chat:typing', payload);
+                }
+            } catch {
+                // Typing is best effort.
+            }
         });
 
         socket.on('disconnect', () => {

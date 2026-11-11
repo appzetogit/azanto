@@ -246,11 +246,24 @@ export async function getHistory(me, { conversationId, page = 1, limit = 30 }) {
     if (!conversationId) throw new ValidationError('conversationId is required');
     const myToken = partyToken(me.role, me.id);
 
-    const first = await FoodChatMessage.findOne({ conversationId }).select('participants').lean();
-    if (!first) return { messages: [], pagination: { page: 1, limit, total: 0, totalPages: 1 } };
-    if (!first.participants.includes(myToken)) {
-        throw new ForbiddenError('Not your conversation');
+    const any = await FoodChatMessage.exists({ conversationId });
+    if (!any) return { messages: [], pagination: { page: 1, limit, total: 0, totalPages: 1 } };
+    // Any message I took part in, not just the first one: after the order is
+    // reassigned the first message's participants name the previous rider.
+    let allowed = Boolean(await FoodChatMessage.exists({ conversationId, participants: myToken }));
+    if (!allowed && mongoose.Types.ObjectId.isValid(conversationId)) {
+        // Customer <-> rider threads are keyed on the order _id: the order's
+        // customer and its current rider may read the whole thread.
+        const order = await FoodOrder.findById(conversationId)
+            .select('userId dispatch.deliveryPartnerId')
+            .lean();
+        const myId = String(me.id);
+        allowed = Boolean(order) && (
+            (me.role === 'USER' && String(order.userId || '') === myId) ||
+            (me.role === 'DELIVERY_PARTNER' && String(order.dispatch?.deliveryPartnerId || '') === myId)
+        );
     }
+    if (!allowed) throw new ForbiddenError('Not your conversation');
 
     const p = Math.max(1, parseInt(page, 10) || 1);
     const l = Math.min(Math.max(parseInt(limit, 10) || 30, 1), 100);

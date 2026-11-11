@@ -796,8 +796,16 @@ export async function getOrderById(
     throw new ForbiddenError("Not your order");
   if (restaurantId && orderRestaurantId !== restaurantId.toString())
     throw new ForbiddenError("Not your restaurant order");
-  if (deliveryPartnerId && orderPartnerId !== deliveryPartnerId.toString())
-    throw new ForbiddenError("Not assigned to you");
+  if (deliveryPartnerId && orderPartnerId !== deliveryPartnerId.toString()) {
+    // A broadcast offer doesn't assign the rider, but the app loads the order's
+    // details before they accept -- let a rider with a live offer read it.
+    const me = deliveryPartnerId.toString();
+    const hasLiveOffer = (order.dispatch?.offeredTo || []).some(
+      (o) => String(o?.partnerId?._id ?? o?.partnerId) === me && (o?.action || 'offered') === 'offered',
+    );
+    const stillOpen = !orderPartnerId || order.dispatch?.status !== 'accepted';
+    if (!(hasLiveOffer && stillOpen)) throw new ForbiddenError("Not assigned to you");
+  }
 
   if (deliveryPartnerId || restaurantId) {
     const external = sanitizeOrderForExternal(order);
