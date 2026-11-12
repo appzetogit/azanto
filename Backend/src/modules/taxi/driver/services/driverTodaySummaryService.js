@@ -164,6 +164,39 @@ export const syncDriverTodaySummaryDocument = async (driver, { now = new Date() 
   return nextSummary;
 };
 
+/**
+ * Today's earnings and trip count as the driver app should show them.
+ *
+ * `todaySummary` on the Driver is a counter bumped only when a taxi ride
+ * completes, so a driver who also delivers food saw Rs 0 on the home card
+ * while the earnings screen (food delivery earnings, which also counts the
+ * linked taxi rides and parcels) showed the real figure. For a driver linked
+ * to a food delivery account, take both numbers from that same calculation so
+ * the two screens always agree. Replaces, never adds: that figure already
+ * includes the taxi rides the counter holds.
+ *
+ * Never throws: on any failure the stored summary is returned unchanged.
+ */
+export const withLinkedDeliveryToday = async (driverId, summary) => {
+  if (!driverId || !summary) return summary;
+  try {
+    const { FoodDeliveryPartner } = await import('../../../food/delivery/models/deliveryPartner.model.js');
+    const partner = await FoodDeliveryPartner.findOne({ driverId }).select('_id').lean();
+    if (!partner?._id) return summary;
+    const { getDeliveryPartnerEarnings } = await import('../../../food/delivery/services/delivery.service.js');
+    const today = await getDeliveryPartnerEarnings(String(partner._id), { period: 'today', limit: 1 });
+    const s = today?.summary || {};
+    return {
+      ...summary,
+      earnings: Math.round(normalizeNumber(s.totalEarnings) * 100) / 100,
+      rides: normalizeNumber(s.totalOrders),
+    };
+  } catch (error) {
+    console.error('Failed to read linked delivery earnings for todaySummary', error?.message || error);
+    return summary;
+  }
+};
+
 export const incrementDriverTodaySummaryForCompletedRide = async ({ driverId, completedAt, driverEarnings, distanceMeters }) => {
   if (!driverId) {
     return;

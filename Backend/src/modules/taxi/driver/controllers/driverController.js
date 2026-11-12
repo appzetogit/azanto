@@ -98,6 +98,7 @@ import {
 import {
   buildDriverTodaySummaryFromDocument,
   syncDriverTodaySummaryDocument,
+  withLinkedDeliveryToday,
 } from "../services/driverTodaySummaryService.js";
 
 import { taxiReferralFor } from '../../../../core/referral/referralSettings.service.js';
@@ -2428,10 +2429,12 @@ export const goOnline = async (req, res) => {
 
   const vehicleIconUrl = await resolveVehicleMapIcon(driver.vehicleTypeId);
 
+  const onlineDriver = driver.toObject();
   res.json({
     success: true,
     data: {
-      ...driver.toObject(),
+      ...onlineDriver,
+      todaySummary: await withLinkedDeliveryToday(driver._id, onlineDriver.todaySummary),
       vehicleIconUrl,
     },
   });
@@ -2534,7 +2537,10 @@ export const getCurrentDriver = async (req, res) => {
 
   await clearDriverActiveRideIfStale(driver);
   const vehicleIconUrl = await resolveVehicleMapIcon(driver.vehicleTypeId);
-  const todaySummary = await syncDriverTodaySummaryDocument(driver);
+  const todaySummary = await withLinkedDeliveryToday(
+    driver._id,
+    (await syncDriverTodaySummaryDocument(driver)) || buildDriverTodaySummaryFromDocument(driver),
+  );
 
   res.json({
     success: true,
@@ -2588,7 +2594,7 @@ export const getCurrentDriver = async (req, res) => {
         ? driver.emergencyContacts.map(serializeEmergencyContact)
         : [],
       onboarding: driver.onboarding || {},
-      todaySummary: todaySummary || buildDriverTodaySummaryFromDocument(driver),
+      todaySummary,
       // The daily-selfie requirement was removed from goOnline (see its own
       // comment), but the app's selfieStatus() check still gates on this
       // field being present and dated today -- reporting it as always
@@ -7314,9 +7320,13 @@ export const goOffline = async (req, res) => {
     throw new ApiError(404, "Driver not found");
   }
 
+  const offlineDriver = driver.toObject();
   res.json({
     success: true,
-    data: driver,
+    data: {
+      ...offlineDriver,
+      todaySummary: await withLinkedDeliveryToday(driver._id, offlineDriver.todaySummary),
+    },
   });
 };
 
