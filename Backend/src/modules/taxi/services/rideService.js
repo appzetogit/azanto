@@ -1196,6 +1196,22 @@ export const createRideRecord = async ({
     throw new ApiError(404, 'User not found');
   }
 
+  /*
+   * The admin's "Taxi off in this zone" switch (core/appServices), enforced and
+   * not only shown -- the customer app never reads it. Covers passenger rides
+   * and parcels alike (one "Ride & Parcel" tile), from every path that books:
+   * the ride route, the parcel route and the socket all come through here.
+   * Judged at the pickup. Existing rides are untouched.
+   */
+  {
+    const [pickupLng, pickupLat] = Array.isArray(pickupCoords) ? pickupCoords : [];
+    const { appServiceClosedMessage } = await import('../../../core/appServices/appServices.service.js');
+    const closed = await appServiceClosedMessage('taxi', { lat: pickupLat, lng: pickupLng });
+    if (closed) {
+      throw new ApiError(409, closed);
+    }
+  }
+
   await clearUserActiveRideIfPresent(user);
 
   /*

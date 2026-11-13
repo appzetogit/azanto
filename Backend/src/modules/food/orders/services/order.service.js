@@ -111,6 +111,32 @@ export async function createOrder(userId, dto) {
       throw new ValidationError("Restaurant not accepting orders");
 
     /*
+     * The admin's "Food off in this zone" switch (core/appServices), enforced
+     * here and not only shown: the customer app never reads it, so without
+     * this a closed zone kept taking orders. Checked at the restaurant -- food
+     * zones are drawn around restaurants and its location is always known --
+     * and at the delivery point when the client sent coordinates.
+     */
+    {
+      const { appServiceClosedMessage } = await import(
+        "../../../../core/appServices/appServices.service.js"
+      );
+      const pointOf = (loc) => {
+        if (!loc) return null;
+        const c = loc.location?.coordinates || loc.coordinates;
+        if (Array.isArray(c) && c.length === 2) return { lng: c[0], lat: c[1] };
+        const lat = loc.latitude ?? loc.lat ?? loc.location?.latitude;
+        const lng = loc.longitude ?? loc.lng ?? loc.location?.longitude;
+        return lat != null && lng != null ? { lat, lng } : null;
+      };
+      for (const point of [pointOf(restaurant.location), pointOf(dto?.address || dto?.deliveryAddress)]) {
+        if (!point) continue;
+        const closed = await appServiceClosedMessage("food", point);
+        if (closed) throw new ValidationError(closed);
+      }
+    }
+
+    /*
      * Trading hours, enforced here and not only shown.
      *
      * The listing badge tells a customer an outlet is shut; this is what stops

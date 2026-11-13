@@ -171,6 +171,49 @@ export async function resolveAppServicesAt({ lat, lng } = {}) {
     };
 }
 
+// ------------------------------------------------------- enforcement ----
+
+const DEFAULT_CLOSED_MESSAGE = {
+    food: "Sorry, food delivery isn't available here right now. Please try again later.",
+    taxi: "Sorry, rides and parcels aren't available here right now. Please try again later.",
+};
+
+/**
+ * Why `service` must refuse a new order or booking at this point, or null if
+ * it may go ahead.
+ *
+ * The switches above only told the app what to show, so an app that never
+ * asked -- or anyone calling the API directly -- could still order in a zone
+ * the admin had closed. Order and booking creation call this so a closed
+ * service actually stops taking new business. Same rule as the tile
+ * (resolveAppServices): off platform-wide, or off in the zone containing the
+ * point. A point outside every zone is not refused here, as there.
+ *
+ * Fails OPEN, like the rest of this module: if the switches or the zone map
+ * cannot be read, the order goes through rather than the platform stopping.
+ * Already-placed orders and rides are never affected.
+ *
+ * @returns {Promise<string|null>} the admin's message (or a default), or null
+ */
+export async function appServiceClosedMessage(service, { lat, lng } = {}) {
+    if (!isAppService(service)) return null;
+    try {
+        const latitude = toCoordinate(lat, 90);
+        const longitude = toCoordinate(lng, 180);
+        const state = await readState();
+        const zone = latitude !== null && longitude !== null
+            ? await zoneAt(service, latitude, longitude)
+            : undefined;
+        const resolved = resolveAppServices(state, { [service]: zone })
+            .find((s) => s.key === service);
+        if (!resolved || resolved.visible) return null;
+        return resolved.disabledMessage || DEFAULT_CLOSED_MESSAGE[service];
+    } catch (err) {
+        logger.warn(`[app-services] closed-check failed for ${service}, allowing: ${err.message}`);
+        return null;
+    }
+}
+
 // ------------------------------------------------- riders in a zone ----
 
 const DELIVERY_SERVICES = new Set(['food']);
