@@ -6,9 +6,14 @@ import {
   getDelivery,
   getMyActiveDelivery,
   listMyDeliveries,
+  quoteDelivery,
 } from '../controllers/deliveryController.js';
 
 export const deliveryRouter = Router();
+
+// Public like /rides/quote: prices are shown before anyone books. Must be
+// registered before '/:deliveryId' style routes so 'quote' is not taken as an id.
+deliveryRouter.post('/quote', asyncHandler(quoteDelivery));
 
 deliveryRouter.post('/', authenticateOrResolveUser(['user']), asyncHandler(createDelivery));
 deliveryRouter.get('/', authenticateOrResolveUser(['user']), asyncHandler(listMyDeliveries));
