@@ -1307,16 +1307,29 @@ export const listAvailableDrivers = async (req, res) => {
    * up Bike and Scooty too, each at its own price, while EV Scooty itself was
    * the only one actually there. Every approved driver has vehicleTypeId set.
    */
+  /*
+   * Parcel vehicles are the exception. Nobody drives a "Parcel Bike": parcels
+   * are carried by riders whose own vehicle is a Bike (or an Auto for a 3
+   * Wheeler), and dispatch already matches them by vehicle kind
+   * (matchDrivers -> normalizeVehicleKeys). Exact-id matching here left every
+   * parcel vehicle showing no driver nearby while dispatch would have found one.
+   */
+  const requestedVehicle = await DispatchVehicle.findById(vehicleTypeId)
+    .select('name vehicle_type icon_types transport_type')
+    .lean();
+  const isParcelLookup =
+    String(service_type || '').trim().toLowerCase() === 'parcel' ||
+    ['delivery'].includes(String(requestedVehicle?.transport_type || '').toLowerCase());
   const driverMatchFilters = buildDriverMatchFilters({
     vehicleTypeId,
-    vehicleTypeKeys: [],
+    vehicleTypeKeys: isParcelLookup && requestedVehicle ? normalizeVehicleKeys([requestedVehicle]) : [],
     transportType: transport_type,
     // Without this, a delivery-only driver (parcel capability, no taxi) is
     // always filtered out of this lookup -- the unified-dispatch capability
     // check below defaults to requiring `taxi` unless told this is a parcel
     // job, which left the parcel booking screen's ETA permanently empty for
     // a nearby rider who simply never holds that capability.
-    serviceType: service_type,
+    serviceType: isParcelLookup ? 'parcel' : service_type,
   });
 
   const drivers = await Driver.find({
