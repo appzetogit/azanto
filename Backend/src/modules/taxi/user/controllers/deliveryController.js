@@ -59,9 +59,46 @@ export const quoteDelivery = async (req, res) => {
   const { appServiceClosedMessage } = await import('../../../../core/appServices/appServices.service.js');
   const closedMessage = await appServiceClosedMessage('taxi', { lat: pickupCoords[1], lng: pickupCoords[0] });
 
+  /*
+   * The user app asks once per vehicle and reads ONE flat object
+   * (azanto_flutterproject delivery_repository.dart DeliveryQuote.fromJson):
+   * vehicleTypeId, vehicleName, distanceKm, baseDistanceKm, subtotal,
+   * serviceTaxPercentage, serviceTaxAmount, total. It drops a vehicle whose
+   * total is 0, so an unpriceable vehicle simply reports total 0.
+   */
+  const first = quotes[0] || null;
+  let flat = {
+    vehicleTypeId: first ? String(first.vehicleTypeId) : String(vehicleTypeIds[0] || ''),
+    vehicleName: '',
+    distanceKm: first ? Number(((first.measuredDistanceMeters || 0) / 1000).toFixed(2)) : 0,
+    baseDistanceKm: 0,
+    subtotal: Number(first?.fare?.subtotal || 0),
+    serviceTaxPercentage: Number(first?.fare?.serviceTaxPercent || 0),
+    serviceTaxAmount: Number(first?.fare?.serviceTax || 0),
+    total: first?.available ? Number(first?.fare?.total || 0) : 0,
+  };
+  if (flat.vehicleTypeId) {
+    try {
+      const vehicle = await Vehicle.findById(flat.vehicleTypeId).select('name').lean();
+      flat.vehicleName = vehicle?.name || '';
+      const { findZoneByPickup } = await import('../../services/matchingService.js');
+      const { resolveSetPriceForRide } = await import('../../services/rideService.js');
+      const zone = await findZoneByPickup(pickupCoords);
+      const rule = await resolveSetPriceForRide({
+        zoneId: zone?._id || null,
+        transportType: 'delivery',
+        vehicleTypeId: flat.vehicleTypeId,
+      });
+      flat.baseDistanceKm = Number(rule?.base_distance || 0);
+    } catch {
+      // Name and base distance are display extras; the price stands without them.
+    }
+  }
+
   res.json({
     success: true,
     data: {
+      ...flat,
       quotes,
       // Same list under the names a client may look for.
       results: quotes,
