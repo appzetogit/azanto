@@ -64,7 +64,8 @@ import {
 } from '../controllers/outletTimings.controller.js';
 import {
     createRestaurantFoodController,
-    updateRestaurantFoodController
+    updateRestaurantFoodController,
+    deleteRestaurantFoodController
 } from '../controllers/restaurantFood.controller.js';
 import {
     listAddonsController,
@@ -340,6 +341,13 @@ router.patch('/foods/:id', authMiddleware, requireRestaurant, async (req, res, n
     await invalidateCache('restaurants:*');
     next();
 }, updateRestaurantFoodController);
+// Permanent delete of the restaurant's own dish. Without it the seller app
+// could only hide items ("permanent delete is not enabled on the server yet").
+router.delete('/foods/:id', authMiddleware, requireRestaurant, async (req, res, next) => {
+    await invalidateCache('restaurant_menu:*');
+    await invalidateCache('restaurants:*');
+    next();
+}, deleteRestaurantFoodController);
 
 // Bulk Menu Upload
 router.get('/bulk-upload/template', authMiddleware, requireRestaurant, downloadBulkMenuTemplateController);

@@ -596,3 +596,34 @@ export async function updateRestaurantFood(restaurantId, foodId, body = {}) {
 
     return updated;
 }
+
+/**
+ * Restaurant deletes one of its own dishes for good.
+ *
+ * Scoped to the caller's restaurantId: another outlet's id answers 404, never
+ * a delete. Placed orders keep their own name/price snapshot, and combos keep
+ * nameSnapshot/listUnitPrice per component, so neither breaks. The dish is
+ * also pulled from its siblings' "goes well with" lists, which would otherwise
+ * keep pointing at an item that no longer exists.
+ */
+export async function deleteRestaurantFood(restaurantId, foodId) {
+    if (!foodId || !mongoose.Types.ObjectId.isValid(String(foodId))) {
+        throw new ValidationError('Invalid food id');
+    }
+    const deleted = await FoodItem.findOneAndDelete({ _id: foodId, restaurantId }).lean();
+    if (!deleted) return null;
+
+    await FoodItem.updateMany(
+        { restaurantId, suggestedItemIds: deleted._id },
+        { $pull: { suggestedItemIds: deleted._id } }
+    );
+
+    try {
+        const { invalidateMenuCaches } = await import('../../../../middleware/cache.js');
+        await invalidateMenuCaches();
+    } catch (cacheErr) {
+        console.error('Failed to invalidate menu caches after a food delete:', cacheErr);
+    }
+
+    return { id: String(deleted._id) };
+}
